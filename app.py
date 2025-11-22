@@ -384,6 +384,7 @@ def sanitize_content(content: str) -> str:
     urls = url_pattern.findall(content)
 
     embeds = []
+    embedded_urls = []  # Track which URLs get embedded
 
     for url in urls:
         embed_html = None
@@ -402,6 +403,7 @@ def sanitize_content(content: str) -> str:
                 <p class="small" style="margin: 5px 0 0 0;">🎥 YouTube</p>
             </div>
             '''
+            embedded_urls.append(url)
 
         # Spotify embeds
         elif 'spotify.com' in url:
@@ -422,6 +424,7 @@ def sanitize_content(content: str) -> str:
                     <p class="small" style="margin: 5px 0 0 0;">🎵 Spotify</p>
                 </div>
                 '''
+                embedded_urls.append(url)
 
         # Image embeds (jpg, jpeg, png, gif, webp)
         elif re.match(r'.*\.(jpg|jpeg|png|gif|webp)(\?.*)?$', url.lower()):
@@ -431,6 +434,7 @@ def sanitize_content(content: str) -> str:
                 <p class="small" style="margin: 5px 0 0 0;">🖼️ Image</p>
             </div>
             '''
+            embedded_urls.append(url)
 
         # Giphy GIFs
         elif 'giphy.com' in url or 'tenor.com' in url:
@@ -440,12 +444,20 @@ def sanitize_content(content: str) -> str:
                 <p class="small" style="margin: 5px 0 0 0;">🎬 GIF</p>
             </div>
             '''
+            embedded_urls.append(url)
 
         if embed_html:
             embeds.append(embed_html)
 
-    # Make URLs clickable
-    content = url_pattern.sub(r'<a href="\1" target="_blank">\1</a>', content)
+    # Make URLs clickable, but hide embedded ones
+    def replace_url(match):
+        url = match.group(1)
+        if url in embedded_urls:
+            # Hide the URL since it's embedded below
+            return ''
+        return f'<a href="{url}" target="_blank">{url}</a>'
+
+    content = url_pattern.sub(replace_url, content)
 
     # Append embeds at the end
     if embeds:
