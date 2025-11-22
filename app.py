@@ -364,9 +364,9 @@ def generate_handle(name: str) -> str:
 
 
 def get_csrf_token(phone: str) -> str:
-    """Generate CSRF token for a user"""
+    """Generate CSRF token for a user - stable per session"""
     if phone not in csrf_tokens:
-        csrf_tokens[phone] = hashlib.sha256(f"{phone}{SECRET_SALT}{datetime.now()}".encode()).hexdigest()[:16]
+        csrf_tokens[phone] = hashlib.sha256(f"{phone}{SECRET_SALT}".encode()).hexdigest()[:16]
     return csrf_tokens[phone]
 
 
