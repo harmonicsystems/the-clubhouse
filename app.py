@@ -376,11 +376,81 @@ def verify_csrf_token(phone: str, token: str) -> bool:
 
 
 def sanitize_content(content: str) -> str:
-    """Escape HTML and make links clickable"""
+    """Escape HTML, make links clickable, and embed rich media"""
     content = html.escape(content)
-    # Make URLs clickable
+
+    # Extract all URLs first
     url_pattern = re.compile(r'(https?://[^\s]+)')
+    urls = url_pattern.findall(content)
+
+    embeds = []
+
+    for url in urls:
+        embed_html = None
+
+        # YouTube embeds
+        youtube_match = re.match(r'https?://(?:www\.)?(?:youtube\.com/watch\?v=|youtu\.be/)([a-zA-Z0-9_-]+)', url)
+        if youtube_match:
+            video_id = youtube_match.group(1)
+            embed_html = f'''
+            <div style="margin: 15px 0; border: 1px solid #000; background: #f9f9f9; padding: 10px;">
+                <iframe width="100%" height="315" style="max-width: 560px;"
+                    src="https://www.youtube.com/embed/{video_id}"
+                    frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowfullscreen>
+                </iframe>
+                <p class="small" style="margin: 5px 0 0 0;">🎥 YouTube</p>
+            </div>
+            '''
+
+        # Spotify embeds
+        elif 'spotify.com' in url:
+            # Extract Spotify URI (track, album, playlist, artist)
+            spotify_match = re.match(r'https?://open\.spotify\.com/(track|album|playlist|artist)/([a-zA-Z0-9]+)', url)
+            if spotify_match:
+                content_type, content_id = spotify_match.groups()
+                height = "352" if content_type == "playlist" else "152"
+                embed_html = f'''
+                <div style="margin: 15px 0; border: 1px solid #000; background: #f9f9f9; padding: 10px;">
+                    <iframe style="border-radius: 12px; width: 100%; max-width: 560px;"
+                        src="https://open.spotify.com/embed/{content_type}/{content_id}"
+                        height="{height}" frameBorder="0"
+                        allowfullscreen=""
+                        allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+                        loading="lazy">
+                    </iframe>
+                    <p class="small" style="margin: 5px 0 0 0;">🎵 Spotify</p>
+                </div>
+                '''
+
+        # Image embeds (jpg, jpeg, png, gif, webp)
+        elif re.match(r'.*\.(jpg|jpeg|png|gif|webp)(\?.*)?$', url.lower()):
+            embed_html = f'''
+            <div style="margin: 15px 0; border: 1px solid #000; background: #f9f9f9; padding: 10px;">
+                <img src="{url}" style="max-width: 100%; height: auto; display: block;" alt="Image">
+                <p class="small" style="margin: 5px 0 0 0;">🖼️ Image</p>
+            </div>
+            '''
+
+        # Giphy GIFs
+        elif 'giphy.com' in url or 'tenor.com' in url:
+            embed_html = f'''
+            <div style="margin: 15px 0; border: 1px solid #000; background: #f9f9f9; padding: 10px;">
+                <img src="{url}" style="max-width: 100%; height: auto; display: block;" alt="GIF">
+                <p class="small" style="margin: 5px 0 0 0;">🎬 GIF</p>
+            </div>
+            '''
+
+        if embed_html:
+            embeds.append(embed_html)
+
+    # Make URLs clickable
     content = url_pattern.sub(r'<a href="\1" target="_blank">\1</a>', content)
+
+    # Append embeds at the end
+    if embeds:
+        content += '\n' + '\n'.join(embeds)
+
     return content
 
 
