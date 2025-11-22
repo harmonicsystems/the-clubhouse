@@ -1029,7 +1029,13 @@ async def dashboard(request: Request, year: int = None, month: int = None):
 
             # Admin attendance link for past events
             attendance_link = ""
-            event_date = datetime.strptime(event["event_date"], "%Y-%m-%d").date()
+            try:
+                # Try parsing with just date first
+                event_date = datetime.strptime(event["event_date"], "%Y-%m-%d").date()
+            except ValueError:
+                # Fall back to datetime format (old data)
+                event_date = datetime.strptime(event["event_date"].split()[0], "%Y-%m-%d").date()
+
             if member["is_admin"] and event_date <= datetime.now().date() and event["rsvp_count"] > 0:
                 attendance_link = f'<p class="small"><a href="/attendance/{event["id"]}">📋 Track Attendance</a></p>'
 
