@@ -1075,10 +1075,11 @@ async def dashboard(request: Request, year: int = None, month: int = None):
         invite_html = ""
         if member["is_admin"]:
             invite_html = """
-            <h2>Invite Someone</h2>
-            <form method="POST" action="/create_invite">
-                <button type="submit">Generate Invite Code</button>
-            </form>
+            <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #ccc;">
+                <form method="POST" action="/create_invite">
+                    <button type="submit">+ Generate Invite Code</button>
+                </form>
+            </div>
             """
 
     content = f"""
@@ -1088,7 +1089,6 @@ async def dashboard(request: Request, year: int = None, month: int = None):
 
     {calendar_html}
 
-    <h2>Upcoming Events</h2>
     {events_html}
 
     {invite_html}
@@ -1408,15 +1408,13 @@ async def feed(request: Request, q: str = ""):
 
     {search_form}
 
-    <h2>Share an Update</h2>
-    <form method="POST" action="/post">
+    <form method="POST" action="/post" style="margin-bottom: 30px;">
         <input type="hidden" name="csrf_token" value="{csrf_token}">
         <textarea name="content" placeholder="What's on your mind?" rows="3" required maxlength="500"></textarea>
         <p class="small">500 characters max</p>
         <button type="submit">Post</button>
     </form>
 
-    <h2>Recent Posts</h2>
     {posts_html}
     """
 
@@ -1591,7 +1589,6 @@ async def bookmarks_page(request: Request):
         nav_html += '<a href="/feed">Feed</a> | '
         nav_html += '<a href="/members">Members</a> | '
         nav_html += f'<a href="/notifications">🔔 Notifications{notif_badge}</a> | '
-        nav_html += '<a href="/bookmarks">🔖 Bookmarks</a> | '
         nav_html += '<a href="/bookmarks">🔖 Bookmarks</a> | '
         if member["is_admin"]:
             nav_html += '<a href="/admin">Admin</a> | '
@@ -2075,7 +2072,6 @@ async def members_directory(request: Request):
     <h1>👥 Members ({len(members)})</h1>
 
     <div class="event" style="background: #f9f9f9; margin-bottom: 20px;">
-        <h3>Your Status</h3>
         <form method="POST" action="/update_status" style="display: flex; gap: 10px; align-items: center;">
             <select name="status" style="width: auto;">
                 <option value="available" {"selected" if current_status == "available" else ""}>🟢 Available</option>
@@ -2085,8 +2081,6 @@ async def members_directory(request: Request):
             <button type="submit">Update Status</button>
         </form>
     </div>
-
-    <h2>Who's Around?</h2>
 
     {members_list}
     """
@@ -2193,8 +2187,7 @@ async def admin_panel(request: Request):
         <p>Upcoming Events: {event_count}</p>
     </div>
 
-    <h2>Create New Event</h2>
-    <form method="POST" action="/admin/create_event">
+    <form method="POST" action="/admin/create_event" style="margin: 30px 0; padding: 20px; border: 1px solid #000;">
         <input type="text" name="title" placeholder="Event title" required>
         <textarea name="description" placeholder="Description (optional)" rows="3"></textarea>
         <label style="display: block; margin-top: 10px;">Event Date:</label>
@@ -2204,12 +2197,13 @@ async def admin_panel(request: Request):
         <label style="display: block; margin-top: 10px;">End Time (optional):</label>
         <input type="time" name="end_time">
         <input type="number" name="max_spots" placeholder="Max attendees (leave empty for unlimited)" min="1">
-        <button type="submit">Create Event</button>
+        <button type="submit">+ Create Event</button>
     </form>
 
-    <h2>Manage Members & Moderators</h2>
-    <p class="small">Moderators can pin/unpin posts and delete posts/comments.</p>
-    {members_html}
+    <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #ccc;">
+        <p class="small">Moderators can pin/unpin posts and delete posts/comments.</p>
+        {members_html}
+    </div>
     """
 
     return render_html(content)
