@@ -1164,10 +1164,15 @@ async def dashboard(request: Request, year: int = None, month: int = None):
             </div>
             """
 
+    # Create heading with event count
+    event_count_text = ""
+    if len(events) > 0:
+        event_count_text = f" <span class='small' style='color: #666;'>({len(events)} upcoming)</span>"
+
     content = f"""
     {nav_html}
 
-    <h1>🏠 The Clubhouse</h1>
+    <h1>🏠 The Clubhouse{event_count_text}</h1>
 
     {calendar_html}
 
@@ -1492,10 +1497,24 @@ async def feed(request: Request, q: str = ""):
 
     <form method="POST" action="/post" style="margin-bottom: 30px;">
         <input type="hidden" name="csrf_token" value="{csrf_token}">
-        <textarea name="content" placeholder="What's on your mind?" rows="3" required maxlength="500"></textarea>
-        <p class="small">500 characters max</p>
+        <textarea id="post-textarea" name="content" placeholder="What's on your mind?" rows="3" required maxlength="500" oninput="updateCharCount()"></textarea>
+        <p class="small"><span id="char-count">0</span>/500 characters</p>
         <button type="submit">Post</button>
     </form>
+
+    <script>
+    function updateCharCount() {{
+        const textarea = document.getElementById('post-textarea');
+        const count = document.getElementById('char-count');
+        count.textContent = textarea.value.length;
+        // Change color when approaching limit
+        if (textarea.value.length > 450) {{
+            count.style.color = '#d00';
+        }} else {{
+            count.style.color = '#666';
+        }}
+    }}
+    </script>
 
     {posts_html}
     """
@@ -1932,7 +1951,7 @@ async def profile_page(request: Request):
     birthday = member["birthday"] or ""
 
     # Popular emoji choices
-    emoji_options = ["👤", "😀", "😎", "🤓", "🥳", "🤠", "👻", "🤖", "👽", "🦄", "🐱", "🐶", "🐼", "🦊", "🦁", "🐯", "🐻", "🐨", "🐸", "🦉", "🌟", "⭐", "✨", "🔥", "💎", "🎨", "🎭", "🎪", "🎯", "🎲"]
+    emoji_options = ["👤", "😀", "😎", "🤓", "😇", "🤠", "👻", "💀", "🤖", "👽", "🦄", "🐱", "🐶", "🐼", "🦊", "🦁", "🐯", "🐻", "🐨", "🐸", "🦉", "⭐", "💎", "🎨", "🎭", "🎸", "🪕", "🎹"]
 
     emoji_picker = '<div style="display: grid; grid-template-columns: repeat(10, 1fr); gap: 5px; max-width: 400px;">'
     for emoji in emoji_options:
