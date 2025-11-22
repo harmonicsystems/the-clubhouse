@@ -671,7 +671,7 @@ async def home(request: Request):
                     return response
 
     content = """
-    <h1>🏠 The Clubhouse</h1>
+    <h1>The Feed and Seed</h1>
     <p>A small, local community space.</p>
 
     <h2>Members Sign In</h2>
@@ -856,7 +856,7 @@ async def register(invite_code: str = Form(...), name: str = Form(...), phone: s
 
         db.commit()
 
-    message = f"Welcome to The Clubhouse, {name}! 🏠"
+    message = f"Welcome to The Feed and Seed, {name}! 🏠"
     send_sms(phone, message)
 
     response = RedirectResponse(url="/dashboard", status_code=303)
@@ -919,6 +919,8 @@ async def dashboard(request: Request, year: int = None, month: int = None):
             events_by_day[day].append(event)
 
         # Build calendar HTML
+        # Set calendar to start on Sunday (US style)
+        calendar.setfirstweekday(calendar.SUNDAY)
         month_name = calendar.month_name[month]
 
         # Calculate prev/next month
@@ -1017,7 +1019,7 @@ async def dashboard(request: Request, year: int = None, month: int = None):
         {calendar_css}
         <div class="calendar-nav">
             <a href="/dashboard?year={prev_year}&month={prev_month}"><button>← {calendar.month_name[prev_month]}</button></a>
-            <h2>📅 {month_name} {year}</h2>
+            <h2>{month_name} {year}</h2>
             <a href="/dashboard?year={next_year}&month={next_month}"><button>{calendar.month_name[next_month]} →</button></a>
         </div>
 
@@ -1125,7 +1127,7 @@ async def dashboard(request: Request, year: int = None, month: int = None):
             <div class="event" id="event-{event['id']}">
                 <h3>{html.escape(event['title'])}</h3>
                 <p>{html.escape(event['description']) if event['description'] else 'No description'}</p>
-                <p>📅 {event_time_str}</p>
+                <p>{event_time_str}</p>
                 {spots_text}
                 {button}
                 {attendance_link}
@@ -1172,7 +1174,7 @@ async def dashboard(request: Request, year: int = None, month: int = None):
     content = f"""
     {nav_html}
 
-    <h1>🏠 The Clubhouse{event_count_text}</h1>
+    <h1>The Feed and Seed{event_count_text}</h1>
 
     {calendar_html}
 
@@ -1221,7 +1223,7 @@ async def rsvp(event_id: int, request: Request):
             )
             db.commit()
 
-            message = f"You're confirmed for: {event['title']}\n📅 {event['event_date']}"
+            message = f"You're confirmed for: {event['title']}\n {event['event_date']}"
             send_sms(phone, message)
 
     return RedirectResponse(url="/dashboard", status_code=303)
@@ -2447,7 +2449,7 @@ async def attendance_page(event_id: int, request: Request):
     {nav_html}
 
     <h1>📋 Attendance: {event['title']}</h1>
-    <p>📅 {event_time_str}</p>
+    <p>{event_time_str}</p>
     <p><strong>{attended_count} of {len(rsvps)} attended</strong></p>
 
     <div id="attendees">
