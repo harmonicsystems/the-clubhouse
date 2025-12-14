@@ -7,10 +7,13 @@ Step-by-step guide to deploying The Clubhouse to production.
 Before deploying, make sure you've:
 
 - [ ] Run through `TESTING.md` checklist locally
+- [ ] Generated `DATABASE_KEY` for encryption: `openssl rand -hex 32`
 - [ ] Changed `SECRET_SALT` to a secure random value
 - [ ] Set up a Textbelt API key (or plan to use the free tier carefully)
 - [ ] Decided on your domain name
 - [ ] Created a backup of any existing data: `./backup.sh`
+
+**IMPORTANT:** Store your `DATABASE_KEY` securely! If you lose it, you lose all data.
 
 ---
 
@@ -49,15 +52,17 @@ In Railway dashboard → Your Project → Variables, add:
 ```
 PRODUCTION_MODE=true
 SECRET_SALT=your-secure-random-string-here
+DATABASE_KEY=your-64-char-hex-encryption-key
 ADMIN_PHONES=+15551234567
 TEXTBELT_KEY=your-textbelt-key
 SITE_NAME=The Clubhouse
 SITE_URL=https://your-app.railway.app
 ```
 
-Generate a secure SECRET_SALT:
+Generate secure keys:
 ```bash
-openssl rand -hex 32
+openssl rand -hex 32  # For SECRET_SALT
+openssl rand -hex 32  # For DATABASE_KEY (keep this safe!)
 ```
 
 ### Step 4: Set Up Persistent Storage

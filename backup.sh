@@ -4,6 +4,7 @@
 # The Clubhouse - Database Backup Script
 # =============================================================================
 # Creates timestamped backups of your SQLite database.
+# Works with both encrypted (SQLCipher) and unencrypted databases.
 #
 # Usage:
 #   ./backup.sh              # Create a backup
@@ -13,8 +14,14 @@
 
 set -e
 
+# Load environment variables if .env exists
+if [ -f .env ]; then
+    export $(grep -v '^#' .env | xargs)
+fi
+
 # Configuration
 DATABASE_PATH="${DATABASE_PATH:-clubhouse.db}"
+DATABASE_KEY="${DATABASE_KEY:-}"
 BACKUP_DIR="${BACKUP_DIR:-backups}"
 MAX_BACKUPS=30  # Keep last 30 backups
 
@@ -37,13 +44,21 @@ create_backup() {
     TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
     BACKUP_FILE="$BACKUP_DIR/clubhouse_$TIMESTAMP.db"
 
-    # Use SQLite's backup command for consistency
-    sqlite3 "$DATABASE_PATH" ".backup '$BACKUP_FILE'"
+    # For encrypted databases, just copy the file (it stays encrypted)
+    # For unencrypted databases, we could use sqlite3 .backup but cp is safer
+    cp "$DATABASE_PATH" "$BACKUP_FILE"
 
-    # Get some stats
-    MEMBER_COUNT=$(sqlite3 "$DATABASE_PATH" "SELECT COUNT(*) FROM members;" 2>/dev/null || echo "?")
-    POST_COUNT=$(sqlite3 "$DATABASE_PATH" "SELECT COUNT(*) FROM posts;" 2>/dev/null || echo "?")
-    EVENT_COUNT=$(sqlite3 "$DATABASE_PATH" "SELECT COUNT(*) FROM events;" 2>/dev/null || echo "?")
+    # Get some stats (this works for unencrypted; encrypted will show error but that's ok)
+    if [ -z "$DATABASE_KEY" ]; then
+        MEMBER_COUNT=$(sqlite3 "$DATABASE_PATH" "SELECT COUNT(*) FROM members;" 2>/dev/null || echo "?")
+        POST_COUNT=$(sqlite3 "$DATABASE_PATH" "SELECT COUNT(*) FROM posts;" 2>/dev/null || echo "?")
+        EVENT_COUNT=$(sqlite3 "$DATABASE_PATH" "SELECT COUNT(*) FROM events;" 2>/dev/null || echo "?")
+    else
+        # For encrypted databases, we can't easily query from bash
+        MEMBER_COUNT="[encrypted]"
+        POST_COUNT="[encrypted]"
+        EVENT_COUNT="[encrypted]"
+    fi
 
     FILE_SIZE=$(ls -lh "$BACKUP_FILE" | awk '{print $5}')
 
@@ -51,7 +66,12 @@ create_backup() {
     echo ""
     echo "  File: $BACKUP_FILE"
     echo "  Size: $FILE_SIZE"
-    echo "  Data: $MEMBER_COUNT members, $POST_COUNT posts, $EVENT_COUNT events"
+    if [ -z "$DATABASE_KEY" ]; then
+        echo "  Data: $MEMBER_COUNT members, $POST_COUNT posts, $EVENT_COUNT events"
+    else
+        echo "  Data: [encrypted - stats not available from shell]"
+        echo -e "  ${GREEN}🔐 Database is encrypted${NC}"
+    fi
     echo ""
 
     # Cleanup old backups
@@ -136,6 +156,11 @@ restore_backup() {
     echo ""
     echo "If something went wrong, your previous database is at:"
     echo "  $PRE_RESTORE_BACKUP"
+
+    if [ -n "$DATABASE_KEY" ]; then
+        echo ""
+        echo -e "${YELLOW}Note: Database is encrypted. Make sure your DATABASE_KEY is correct.${NC}"
+    fi
 }
 
 # Main

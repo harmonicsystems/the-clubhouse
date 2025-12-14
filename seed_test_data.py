@@ -4,15 +4,34 @@ Seed test data for The Clubhouse
 Creates sample members, events, posts, and interactions
 """
 
-import sqlite3
-from datetime import datetime, timedelta
-import random
+# Use sqlcipher3 for encrypted database (falls back to sqlite3 if not available)
+try:
+    from sqlcipher3 import dbapi2 as sqlite3
+    ENCRYPTION_AVAILABLE = True
+except ImportError:
+    import sqlite3
+    ENCRYPTION_AVAILABLE = False
 
-DATABASE_PATH = "clubhouse.db"
+from datetime import datetime, timedelta
+from dotenv import load_dotenv
+import random
+import os
+
+# Load environment variables
+load_dotenv()
+
+DATABASE_PATH = os.getenv("DATABASE_PATH", "clubhouse.db")
+DATABASE_KEY = os.getenv("DATABASE_KEY", "")
 
 def seed_database():
     """Fill database with realistic test data"""
     conn = sqlite3.connect(DATABASE_PATH)
+
+    # Set encryption key if available
+    if ENCRYPTION_AVAILABLE and DATABASE_KEY:
+        conn.execute(f"PRAGMA key = '{DATABASE_KEY}'")
+        print("🔐 Using encrypted database")
+
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
 

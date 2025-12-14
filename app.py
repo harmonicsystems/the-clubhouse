@@ -3,7 +3,14 @@ The Clubhouse - A simple, local-first community platform
 Phone numbers only. No passwords. SQLite database. Pure simplicity.
 """
 
-import sqlite3
+# Use sqlcipher3 for encrypted database (falls back to sqlite3 if not available)
+try:
+    from sqlcipher3 import dbapi2 as sqlite3
+    ENCRYPTION_AVAILABLE = True
+except ImportError:
+    import sqlite3
+    ENCRYPTION_AVAILABLE = False
+
 import random
 import os
 import html
@@ -38,6 +45,9 @@ SITE_URL = os.getenv("SITE_URL", "")
 CONTACT_EMAIL = os.getenv("CONTACT_EMAIL", "")
 MAX_MEMBERS = 200
 
+# Database encryption key
+DATABASE_KEY = os.getenv("DATABASE_KEY", "")
+
 # Production mode: enables secure cookies, hides SMS codes on screen
 PRODUCTION_MODE = os.getenv("PRODUCTION_MODE", "false").lower() == "true"
 
@@ -45,6 +55,15 @@ PRODUCTION_MODE = os.getenv("PRODUCTION_MODE", "false").lower() == "true"
 if PRODUCTION_MODE and SECRET_SALT == "change-me-please":
     print("⚠️  WARNING: Running in production mode with default SECRET_SALT!")
     print("   Generate a secure salt with: openssl rand -hex 32")
+
+# Warn about encryption status
+if ENCRYPTION_AVAILABLE and DATABASE_KEY:
+    print("🔐 Database encryption enabled")
+elif ENCRYPTION_AVAILABLE and not DATABASE_KEY:
+    print("⚠️  WARNING: sqlcipher3 available but DATABASE_KEY not set - database is NOT encrypted")
+    print("   Generate a key with: openssl rand -hex 32")
+else:
+    print("ℹ️  Database encryption not available (sqlcipher3 not installed)")
 
 # In-memory storage
 phone_codes = {}  # {phone: {"code": 123456, "created": datetime}}
@@ -58,6 +77,11 @@ csrf_tokens = {}  # {phone: token}
 def get_db():
     """Open database, do stuff, close database"""
     conn = sqlite3.connect(DATABASE_PATH)
+
+    # Set encryption key if available
+    if ENCRYPTION_AVAILABLE and DATABASE_KEY:
+        conn.execute(f"PRAGMA key = '{DATABASE_KEY}'")
+
     conn.row_factory = sqlite3.Row
     try:
         yield conn

@@ -3,3 +3,4 @@ uvicorn[standard]==0.27.0
 python-dotenv==1.0.0
 requests==2.31.0
 python-multipart==0.0.9
+sqlcipher3-binary==0.5.4

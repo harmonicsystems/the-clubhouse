@@ -55,6 +55,7 @@ Copy `.env.example` to `.env` and configure:
 |----------|-------------|
 | `ADMIN_PHONES` | Comma-separated admin phone numbers |
 | `SECRET_SALT` | Random string for security (run `openssl rand -hex 32`) |
+| `DATABASE_KEY` | Encryption key for database (run `openssl rand -hex 32`) |
 | `TEXTBELT_KEY` | SMS API key (`textbelt` for 1 free/day) |
 | `PRODUCTION_MODE` | Set to `true` for production |
 | `SITE_NAME` | Your community name |
@@ -74,17 +75,21 @@ See [DEPLOY.md](DEPLOY.md) for step-by-step deployment instructions.
 
 ```
 clubhouse/
-├── app.py              # The entire application
-├── requirements.txt    # Python dependencies
-├── .env.example        # Environment template
-├── seed_test_data.py   # Test data seeder
-├── backup.sh           # Database backup script
-├── TESTING.md          # Manual testing checklist
-├── DEPLOY.md           # Deployment guide
-├── railway.json        # Railway config
-├── render.yaml         # Render config
-└── Procfile            # Process file for deployment
+├── app.py                     # The entire application
+├── requirements.txt           # Python dependencies
+├── .env.example               # Environment template
+├── seed_test_data.py          # Test data seeder
+├── backup.sh                  # Database backup script
+├── migrate_to_encrypted.py    # Encryption migration tool
+├── HOW-IT-WORKS.md            # Plain-language guide (no coding required)
+├── TESTING.md                 # Manual testing checklist
+├── DEPLOY.md                  # Deployment guide
+├── railway.json               # Railway config
+├── render.yaml                # Render config
+└── Procfile                   # Process file for deployment
 ```
+
+**New to all this?** Start with [HOW-IT-WORKS.md](HOW-IT-WORKS.md) - it explains everything in plain English.
 
 ## Testing
 
@@ -131,28 +136,30 @@ Read `app.py` top-to-bottom - it's designed to be understood in one sitting.
 
 ## Database
 
-SQLite makes everything simple:
+The database uses SQLCipher for encryption - all phone numbers and data are encrypted at rest.
+
+**Important:** Keep your `DATABASE_KEY` safe! If you lose it, you lose your data.
 
 ```bash
-sqlite3 clubhouse.db
+# Migrate existing unencrypted database
+python migrate_to_encrypted.py
 
-# See all members
-SELECT * FROM members;
-
-# Make someone admin
-UPDATE members SET is_admin = 1 WHERE phone = '5551234567';
-
-# See events
-SELECT * FROM events;
+# For encrypted databases, use Python:
+python
+>>> from sqlcipher3 import dbapi2 as sqlite3
+>>> conn = sqlite3.connect("clubhouse.db")
+>>> conn.execute("PRAGMA key = 'your-key-here'")
+>>> conn.execute("SELECT * FROM members").fetchall()
 ```
 
 ## Security
 
-- SMS-based authentication (no passwords to leak)
-- HMAC-signed cookies with secure flags in production
-- CSRF protection on all forms
-- Rate limiting on SMS codes
-- HTML sanitization on user content
+- **Encrypted database** - SQLCipher encrypts all data at rest
+- **SMS-based authentication** - No passwords to leak
+- **HMAC-signed cookies** - Secure flags in production
+- **CSRF protection** - On all forms
+- **Rate limiting** - On SMS codes
+- **HTML sanitization** - On user content
 
 ## License
 
