@@ -1,0 +1,26 @@
+# Render.com deployment configuration
+# https://render.com/docs/yaml-spec
+
+services:
+  - type: web
+    name: clubhouse
+    env: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PRODUCTION_MODE
+        value: true
+      - key: DATABASE_PATH
+        value: /app/data/clubhouse.db
+      - key: SECRET_SALT
+        sync: false  # Set this manually in dashboard
+      - key: ADMIN_PHONES
+        sync: false
+      - key: TEXTBELT_KEY
+        sync: false
+    disk:
+      name: clubhouse-data
+      mountPath: /app/data
+      sizeGB: 1

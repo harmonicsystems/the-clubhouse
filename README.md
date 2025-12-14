@@ -1,61 +1,139 @@
-# The Clubhouse 🏠
+# The Clubhouse
 
-A simple, local-first community platform for 50-200 people. Phone numbers only. No passwords. Pure simplicity.
+A simple, local-first community platform for small groups (50-200 people). Phone numbers only. No passwords. Pure simplicity.
 
 ## Philosophy
 
-- **Phone numbers as identity** - SMS verification, no passwords
-- **SQLite database** - Just a file on disk
-- **Everything in one file** - The entire app is in `app.py` (1,169 lines)
-- **No JavaScript needed** - Pure HTML forms
-- **Limited membership** - Maximum 200 members
-- **Invite codes required** - No public signups
+- **Phone numbers as identity** - SMS verification, no passwords to remember
+- **SQLite database** - Just a file on disk, easy to backup
+- **Everything in one file** - The entire app is in `app.py`
+- **No JavaScript required** - Pure HTML forms
+- **Limited membership** - Maximum 200 members (it's a feature, not a bug)
+- **Invite-only** - No public signups, community stays intentional
 
 ## Features
 
-✅ **SMS Authentication** - Login with phone number verification codes
-✅ **Events** - Create events, RSVP, track attendees
-✅ **Community Feed** - Post updates, see what's happening
-✅ **Reactions** - React to posts with emojis (👍 ❤️ 😂 🎉 🔥)
-✅ **Comments** - Reply to posts with threaded comments
-✅ **Invite System** - Members generate one-time invite codes
-✅ **Admin Panel** - Create events, manage community
+- **SMS Authentication** - Login with phone verification codes
+- **Events** - Create events, RSVP, track attendance
+- **Community Feed** - Posts with reactions and comments
+- **Polls** - Community voting
+- **Notifications** - Stay updated on activity
+- **Member Profiles** - Avatars, status, birthdays
+- **Admin Panel** - Manage community and events
+- **Bookmarks** - Save posts for later
 
 ## Quick Start
 
-1. **Install dependencies**
 ```bash
+# 1. Clone and setup
+git clone https://github.com/YOUR_USERNAME/clubhouse.git
+cd clubhouse
 pip install -r requirements.txt
-```
 
-2. **Configure environment**
-```bash
+# 2. Configure
 cp .env.example .env
-# Edit .env with your admin phone number and settings
+# Edit .env with your settings
+
+# 3. Seed test data (optional)
+python seed_test_data.py
+
+# 4. Run
+uvicorn app:app --reload
 ```
 
-3. **Run the server**
+Visit http://localhost:8000
+
+**Test Accounts** (after seeding):
+- Admin: `555-123-4567`
+- Unused invite codes: `MOON-742`, `BIRD-156`
+
+## Configuration
+
+Copy `.env.example` to `.env` and configure:
+
+| Variable | Description |
+|----------|-------------|
+| `ADMIN_PHONES` | Comma-separated admin phone numbers |
+| `SECRET_SALT` | Random string for security (run `openssl rand -hex 32`) |
+| `TEXTBELT_KEY` | SMS API key (`textbelt` for 1 free/day) |
+| `PRODUCTION_MODE` | Set to `true` for production |
+| `SITE_NAME` | Your community name |
+
+## Deployment
+
+See [DEPLOY.md](DEPLOY.md) for step-by-step deployment instructions.
+
+**Quick deploy options:**
+- **Railway** - Free tier, automatic HTTPS
+- **Render** - Free tier, automatic HTTPS
+- **VPS** - $5/month, full control
+
+**Estimated costs:** $0-17/month
+
+## Project Structure
+
+```
+clubhouse/
+├── app.py              # The entire application
+├── requirements.txt    # Python dependencies
+├── .env.example        # Environment template
+├── seed_test_data.py   # Test data seeder
+├── backup.sh           # Database backup script
+├── TESTING.md          # Manual testing checklist
+├── DEPLOY.md           # Deployment guide
+├── railway.json        # Railway config
+├── render.yaml         # Render config
+└── Procfile            # Process file for deployment
+```
+
+## Testing
+
 ```bash
-uvicorn app:app --reload --host 0.0.0.0 --port 8000
+# Seed fresh test data
+python seed_test_data.py
+
+# Run the app
+uvicorn app:app --reload
+
+# Walk through TESTING.md checklist
+
+# Check health
+curl http://localhost:8000/health
 ```
 
-4. **Visit** http://localhost:8000
+## Backups
 
-## Environment Variables
+```bash
+./backup.sh              # Create backup
+./backup.sh list         # List backups
+./backup.sh restore 1    # Restore most recent
+```
 
-Edit `.env` with your settings:
+## Customization
 
-- `ADMIN_PHONES` - Comma-separated admin phone numbers (e.g., `+15551234567`)
-- `TEXTBELT_KEY` - Textbelt API key (`textbelt` for 1 free/day, or your paid key)
-- `SECRET_SALT` - Random string for cookie signing (change from default!)
-- `DATABASE_PATH` - SQLite database file path (default: `clubhouse.db`)
+### Theming
 
-## Database Management
+The CSS uses variables for easy customization. Edit the `:root` section in `app.py`:
+
+```css
+:root {
+    --color-bg: #fff;
+    --color-text: #000;
+    --color-accent: #000;
+    /* ... */
+}
+```
+
+### Adding Features
+
+The codebase is intentionally simple. Each route is self-contained.
+Read `app.py` top-to-bottom - it's designed to be understood in one sitting.
+
+## Database
 
 SQLite makes everything simple:
 
 ```bash
-# Open database
 sqlite3 clubhouse.db
 
 # See all members
@@ -64,98 +142,27 @@ SELECT * FROM members;
 # Make someone admin
 UPDATE members SET is_admin = 1 WHERE phone = '5551234567';
 
-# See all events
+# See events
 SELECT * FROM events;
-
-# See all posts
-SELECT * FROM posts;
 ```
-
-## Deployment
-
-### Quick Deploy (Ubuntu/Debian VPS)
-
-1. Get a $5/month VPS (DigitalOcean, Linode, Hetzner, etc.)
-2. Install Python 3.9+
-3. Run the deploy script:
-
-```bash
-chmod +x deploy.sh
-./deploy.sh
-```
-
-### Manual Deployment
-
-```bash
-# Install dependencies
-sudo apt-get update
-sudo apt-get install -y python3 python3-pip python3-venv
-
-# Create app directory
-sudo mkdir -p /opt/clubhouse
-cd /opt/clubhouse
-
-# Copy files
-sudo cp app.py requirements.txt .env ./
-
-# Install packages
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-
-# Run with systemd (see deploy.sh for full setup)
-```
-
-## Costs
-
-Running your own social network is cheap:
-
-- **Server**: $5/month (VPS)
-- **SMS**: ~$10/month at 1¢ per text (100 texts)
-- **Domain**: $12/year (optional)
-
-**Total: ~$16/month** for your own private community platform
 
 ## Security
 
 - SMS-based authentication (no passwords to leak)
-- Cookie-based sessions with HMAC signing
+- HMAC-signed cookies with secure flags in production
 - CSRF protection on all forms
 - Rate limiting on SMS codes
-- Admin-only features protected
-- HTML sanitization on all user content
-
-## Architecture
-
-Everything is in `app.py`:
-- **~100 lines**: Database setup
-- **~200 lines**: Helper functions
-- **~150 lines**: HTML template
-- **~700 lines**: Routes (auth, events, feed, admin)
-
-No frameworks. No complexity. Just FastAPI, SQLite, and HTML forms.
-
-## Development
-
-```bash
-# Run with auto-reload
-uvicorn app:app --reload
-
-# Check database
-sqlite3 clubhouse.db "SELECT COUNT(*) FROM members;"
-
-# View logs
-# Just watch the terminal - no fancy logging needed
-```
+- HTML sanitization on user content
 
 ## License
 
-Do whatever you want with this code. It's meant to be simple and hackable.
+MIT - Do whatever you want with this code.
 
-## Support
+## Contributing
 
-This is a personal project. No support is provided, but the code is simple enough to understand and modify yourself. That's the point!
+This is meant to be simple and hackable. Fork it, modify it, make it yours.
+The best contribution is building your own community with it.
 
 ---
 
-Built with ❤️ for small, local communities who want to own their own social space.
+Built with care for small, local communities who want to own their own space.

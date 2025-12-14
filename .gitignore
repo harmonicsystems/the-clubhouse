@@ -4,6 +4,10 @@
 # Database
 *.db
 *.db-journal
+backups/
+
+# Uploads
+static/uploads/
 
 # Python
 __pycache__/
@@ -18,3 +22,9 @@ ENV/
 # OS
 .DS_Store
 Thumbs.db
+
+# Logs
+*.log
+
+# Personal notes (not for repo)
+CHEATSHEET.md

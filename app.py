@@ -13,8 +13,9 @@ from datetime import datetime, timedelta
 from typing import Optional
 from contextlib import contextmanager
 import requests
-from fastapi import FastAPI, Request, Form, HTTPException
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi import FastAPI, Request, Form, HTTPException, UploadFile, File
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
 import hashlib
 
@@ -24,12 +25,26 @@ load_dotenv()
 # Create our app
 app = FastAPI(title="The Clubhouse", docs_url=None, redoc_url=None)
 
+# Mount static files for uploads
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
 # Configuration
 ADMIN_PHONES = os.getenv("ADMIN_PHONES", "").split(",")
 TEXTBELT_KEY = os.getenv("TEXTBELT_KEY", "textbelt")
 SECRET_SALT = os.getenv("SECRET_SALT", "change-me-please")
 DATABASE_PATH = os.getenv("DATABASE_PATH", "clubhouse.db")
+SITE_NAME = os.getenv("SITE_NAME", "The Clubhouse")
+SITE_URL = os.getenv("SITE_URL", "")
+CONTACT_EMAIL = os.getenv("CONTACT_EMAIL", "")
 MAX_MEMBERS = 200
+
+# Production mode: enables secure cookies, hides SMS codes on screen
+PRODUCTION_MODE = os.getenv("PRODUCTION_MODE", "false").lower() == "true"
+
+# Warn if running in production without changing defaults
+if PRODUCTION_MODE and SECRET_SALT == "change-me-please":
+    print("⚠️  WARNING: Running in production mode with default SECRET_SALT!")
+    print("   Generate a secure salt with: openssl rand -hex 32")
 
 # In-memory storage
 phone_codes = {}  # {phone: {"code": 123456, "created": datetime}}
@@ -101,6 +116,12 @@ def init_database():
         except:
             pass  # Column already exists
 
+        # Add bio column (future-proofing for member profiles)
+        try:
+            db.execute("ALTER TABLE members ADD COLUMN bio TEXT")
+        except:
+            pass  # Column already exists
+
         # Events table
         db.execute("""
             CREATE TABLE IF NOT EXISTS events (
@@ -123,6 +144,18 @@ def init_database():
             pass
         try:
             db.execute("ALTER TABLE events ADD COLUMN end_time TEXT")
+        except:
+            pass
+
+        # Add location column (future-proofing for event venues)
+        try:
+            db.execute("ALTER TABLE events ADD COLUMN location TEXT")
+        except:
+            pass
+
+        # Add created_by_phone column (audit trail for who created events)
+        try:
+            db.execute("ALTER TABLE events ADD COLUMN created_by_phone TEXT")
         except:
             pass
 
@@ -213,6 +246,50 @@ def init_database():
                 post_id INTEGER NOT NULL,
                 created_date TEXT DEFAULT CURRENT_TIMESTAMP,
                 PRIMARY KEY (phone, post_id)
+            )
+        """)
+
+        # Event photos table
+        db.execute("""
+            CREATE TABLE IF NOT EXISTS event_photos (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                event_id INTEGER NOT NULL,
+                photo_url TEXT NOT NULL,
+                caption TEXT,
+                uploaded_by_phone TEXT NOT NULL,
+                uploaded_date TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        # Polls table
+        db.execute("""
+            CREATE TABLE IF NOT EXISTS polls (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                question TEXT NOT NULL,
+                created_by_phone TEXT NOT NULL,
+                created_date TEXT DEFAULT CURRENT_TIMESTAMP,
+                is_active BOOLEAN DEFAULT 1
+            )
+        """)
+
+        # Poll options table
+        db.execute("""
+            CREATE TABLE IF NOT EXISTS poll_options (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                poll_id INTEGER NOT NULL,
+                option_text TEXT NOT NULL,
+                vote_count INTEGER DEFAULT 0
+            )
+        """)
+
+        # Poll votes table (track who voted)
+        db.execute("""
+            CREATE TABLE IF NOT EXISTS poll_votes (
+                poll_id INTEGER NOT NULL,
+                phone TEXT NOT NULL,
+                option_id INTEGER NOT NULL,
+                voted_date TEXT DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (poll_id, phone)
             )
         """)
 
@@ -312,6 +389,18 @@ def read_cookie(cookie: str) -> Optional[str]:
     if cookie[:20] == expected:
         return phone
     return None
+
+
+def set_auth_cookie(response, phone: str):
+    """Set authentication cookie with appropriate security settings"""
+    response.set_cookie(
+        key="clubhouse",
+        value=make_cookie(phone),
+        max_age=604800,  # 7 days
+        httponly=True,
+        secure=PRODUCTION_MODE,  # Only send over HTTPS in production
+        samesite="lax"  # Prevents CSRF while allowing normal navigation
+    )
 
 
 def create_notification(recipient_phone: str, actor_phone: str, notif_type: str, message: str, related_id: int = None):
@@ -530,20 +619,39 @@ def render_html(content: str, title: str = "The Clubhouse") -> HTMLResponse:
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <title>{title}</title>
         <style>
+            /* ============ THEME VARIABLES ============ */
+            /* Change these to customize the look! */
+            :root {{
+                --color-bg: #fff;
+                --color-text: #000;
+                --color-text-muted: #666;
+                --color-border: #000;
+                --color-border-light: #ddd;
+                --color-accent: #000;
+                --color-accent-hover: #333;
+                --color-success: #28a745;
+                --color-highlight: #f0f0f0;
+                --font-main: 'Courier New', monospace;
+                --font-size: 16px;
+                --max-width: 600px;
+                --spacing: 20px;
+            }}
+
+            /* ============ BASE STYLES ============ */
             body {{
-                max-width: 600px;
+                max-width: var(--max-width);
                 margin: 50px auto;
-                padding: 20px;
-                font-family: 'Courier New', monospace;
-                font-size: 16px;
+                padding: var(--spacing);
+                font-family: var(--font-main);
+                font-size: var(--font-size);
                 line-height: 1.6;
-                color: #000;
-                background: #fff;
+                color: var(--color-text);
+                background: var(--color-bg);
             }}
             h1 {{
                 font-size: 24px;
                 margin-bottom: 30px;
-                border-bottom: 2px solid #000;
+                border-bottom: 2px solid var(--color-border);
                 padding-bottom: 10px;
             }}
             h2 {{
@@ -557,28 +665,45 @@ def render_html(content: str, title: str = "The Clubhouse") -> HTMLResponse:
                 margin: 10px 0;
                 width: 100%;
                 box-sizing: border-box;
-                border: 1px solid #000;
+                border: 1px solid var(--color-border);
+                background: var(--color-bg);
+                color: var(--color-text);
             }}
             button {{
                 font-family: inherit;
                 font-size: inherit;
                 padding: 10px 20px;
-                background: #000;
-                color: #fff;
+                background: var(--color-accent);
+                color: var(--color-bg);
                 border: none;
                 cursor: pointer;
                 margin-top: 10px;
             }}
             button:hover {{
-                background: #333;
+                background: var(--color-accent-hover);
             }}
             .event {{
-                border: 1px solid #000;
+                border: 1px solid var(--color-border);
                 padding: 15px;
                 margin: 15px 0;
             }}
+            .photo-gallery {{
+                display: grid;
+                grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+                gap: 10px;
+                margin-top: 15px;
+            }}
+            .photo-item {{
+                border: 1px solid var(--color-border-light);
+                padding: 5px;
+            }}
+            .photo-item img {{
+                width: 100%;
+                height: auto;
+                display: block;
+            }}
             .post {{
-                border: 1px solid #000;
+                border: 1px solid var(--color-border);
                 padding: 15px;
                 margin: 15px 0;
             }}
@@ -586,7 +711,7 @@ def render_html(content: str, title: str = "The Clubhouse") -> HTMLResponse:
                 display: flex;
                 justify-content: space-between;
                 font-size: 14px;
-                color: #666;
+                color: var(--color-text-muted);
                 margin-bottom: 10px;
             }}
             .post-content {{
@@ -595,49 +720,49 @@ def render_html(content: str, title: str = "The Clubhouse") -> HTMLResponse:
             .reactions {{
                 margin-top: 10px;
                 padding-top: 10px;
-                border-top: 1px solid #eee;
+                border-top: 1px solid var(--color-border-light);
             }}
             .reaction-btn {{
                 display: inline-block;
                 padding: 4px 8px;
                 margin: 2px;
-                border: 1px solid #ddd;
+                border: 1px solid var(--color-border-light);
                 text-decoration: none;
                 border-radius: 4px;
             }}
             .reaction-btn:hover {{
-                background: #f0f0f0;
+                background: var(--color-highlight);
             }}
             .reaction-btn.active {{
-                background: #e0e0e0;
-                border-color: #000;
+                background: var(--color-highlight);
+                border-color: var(--color-border);
             }}
             .small {{
                 font-size: 12px;
-                color: #666;
+                color: var(--color-text-muted);
             }}
             .error {{
-                color: red;
+                color: #c00;
                 margin: 10px 0;
             }}
             .success {{
-                color: green;
+                color: var(--color-success);
                 margin: 10px 0;
             }}
             a {{
-                color: #000;
+                color: var(--color-text);
             }}
             .nav {{
                 margin-bottom: 30px;
                 padding-bottom: 10px;
-                border-bottom: 1px solid #000;
+                border-bottom: 1px solid var(--color-border);
             }}
             details {{
                 margin-top: 10px;
             }}
             summary {{
                 cursor: pointer;
-                color: #666;
+                color: var(--color-text-muted);
                 font-size: 14px;
             }}
         </style>
@@ -670,8 +795,8 @@ async def home(request: Request):
                     response.delete_cookie("clubhouse")
                     return response
 
-    content = """
-    <h1>The Feed and Seed</h1>
+    content = f"""
+    <h1>{SITE_NAME}</h1>
     <p>A small, local community space.</p>
 
     <h2>Members Sign In</h2>
@@ -687,6 +812,9 @@ async def home(request: Request):
     </form>
 
     <p class="small">This is a private community. Invite codes only.</p>
+
+    <hr style="margin-top: 40px; border: none; border-top: 1px solid var(--color-border-light);">
+    <p class="small"><a href="/contact">Contact</a> · <a href="/privacy">Privacy</a></p>
     """
     return render_html(content)
 
@@ -718,31 +846,46 @@ async def send_code(phone: str = Form(...)):
     code = generate_code()
     phone_codes[phone] = {"code": code, "created": datetime.now()}
 
-    message = f"Clubhouse login code: {code}\n\nThis code expires in 10 minutes."
+    message = f"{SITE_NAME} login code: {code}\n\nThis code expires in 10 minutes."
 
-    # Print code to console for testing
-    print(f"\n📱 SMS CODE FOR {format_phone(phone)}: {code}\n")
+    # Send SMS
+    sms_sent = send_sms(phone, message)
 
-    # Always show the code on screen for testing (remove this in production!)
-    content = f"""
-    <h1>📱 Code Generated!</h1>
-    <p>Your login code for {format_phone(phone)} is:</p>
-    <h2 style="background: #f0f0f0; padding: 20px; text-align: center; font-size: 32px;">
-        {code}
-    </h2>
+    if PRODUCTION_MODE:
+        # Production: Don't show code on screen, user must check their phone
+        content = f"""
+        <h1>📱 Code Sent!</h1>
+        <p>We sent a 6-digit code to {format_phone(phone)}</p>
 
-    <form method="POST" action="/verify">
-        <input type="hidden" name="phone" value="{phone}">
-        <input type="text" name="code" placeholder="000000" maxlength="6" required value="{code}">
-        <button type="submit">Verify</button>
-    </form>
+        <form method="POST" action="/verify">
+            <input type="hidden" name="phone" value="{phone}">
+            <input type="text" name="code" placeholder="Enter 6-digit code" maxlength="6" required
+                   inputmode="numeric" pattern="[0-9]*" autocomplete="one-time-code">
+            <button type="submit">Verify</button>
+        </form>
 
-    <p class="small">Note: In production, this would be sent via SMS. For testing, the code is shown here.</p>
-    <a href="/">← Back</a>
-    """
+        <p class="small">Didn't receive it? Check your spam folder or <a href="/">try again</a>.</p>
+        """
+    else:
+        # Development: Show code on screen for easy testing
+        print(f"\n📱 SMS CODE FOR {format_phone(phone)}: {code}\n")
 
-    # Still try to send SMS in background
-    send_sms(phone, message)
+        content = f"""
+        <h1>📱 Code Generated!</h1>
+        <p>Your login code for {format_phone(phone)} is:</p>
+        <h2 style="background: #f0f0f0; padding: 20px; text-align: center; font-size: 32px;">
+            {code}
+        </h2>
+
+        <form method="POST" action="/verify">
+            <input type="hidden" name="phone" value="{phone}">
+            <input type="text" name="code" placeholder="000000" maxlength="6" required value="{code}">
+            <button type="submit">Verify</button>
+        </form>
+
+        <p class="small">🔧 Dev mode: Code shown on screen. Set PRODUCTION_MODE=true to hide.</p>
+        <a href="/">← Back</a>
+        """
 
     return render_html(content)
 
@@ -756,12 +899,7 @@ async def verify(phone: str = Form(...), code: str = Form(...)):
     if phone in phone_codes and phone_codes[phone]["code"] == code:
         del phone_codes[phone]
         response = RedirectResponse(url="/dashboard", status_code=303)
-        response.set_cookie(
-            key="clubhouse",
-            value=make_cookie(phone),
-            max_age=604800,  # 7 days
-            httponly=True
-        )
+        set_auth_cookie(response, phone)
         return response
     else:
         content = """
@@ -856,16 +994,11 @@ async def register(invite_code: str = Form(...), name: str = Form(...), phone: s
 
         db.commit()
 
-    message = f"Welcome to The Feed and Seed, {name}! 🏠"
+    message = f"Welcome to {SITE_NAME}, {name}!"
     send_sms(phone, message)
 
     response = RedirectResponse(url="/dashboard", status_code=303)
-    response.set_cookie(
-        key="clubhouse",
-        value=make_cookie(phone),
-        max_age=604800,
-        httponly=True
-    )
+    set_auth_cookie(response, phone)
     return response
 
 
@@ -1123,6 +1256,42 @@ async def dashboard(request: Request, year: int = None, month: int = None):
             if member["is_admin"] and event_date <= datetime.now().date() and event["rsvp_count"] > 0:
                 attendance_link = f'<p class="small"><a href="/attendance/{event["id"]}">📋 Track Attendance</a></p>'
 
+            # Get photos for this event
+            photos = db.execute("""
+                SELECT ep.*, m.name as uploader_name
+                FROM event_photos ep
+                JOIN members m ON ep.uploaded_by_phone = m.phone
+                WHERE ep.event_id = ?
+                ORDER BY ep.uploaded_date DESC
+            """, (event["id"],)).fetchall()
+
+            photos_html = ""
+            if photos:
+                photos_html = '<div class="photo-gallery">'
+                for photo in photos:
+                    caption_text = f'<p class="small">{html.escape(photo["caption"])}</p>' if photo["caption"] else ''
+                    photos_html += f'''
+                    <div class="photo-item">
+                        <img src="{photo['photo_url']}" alt="Event photo">
+                        {caption_text}
+                    </div>
+                    '''
+                photos_html += '</div>'
+
+            # Photo upload form for admins on past events
+            upload_form = ""
+            if member["is_admin"] and event_date <= datetime.now().date():
+                upload_form = f'''
+                <details style="margin-top: 15px;">
+                    <summary style="cursor: pointer; color: #666;">📷 Add Photos</summary>
+                    <form method="POST" action="/events/{event["id"]}/upload_photo" enctype="multipart/form-data" style="margin-top: 10px;">
+                        <input type="file" name="photo" accept="image/*" required style="margin-bottom: 10px;">
+                        <input type="text" name="caption" placeholder="Caption (optional)" style="margin-bottom: 10px;">
+                        <button type="submit">Upload Photo</button>
+                    </form>
+                </details>
+                '''
+
             events_html += f"""
             <div class="event" id="event-{event['id']}">
                 <h3>{html.escape(event['title'])}</h3>
@@ -1131,6 +1300,8 @@ async def dashboard(request: Request, year: int = None, month: int = None):
                 {spots_text}
                 {button}
                 {attendance_link}
+                {photos_html}
+                {upload_form}
             </div>
             """
 
@@ -1459,6 +1630,91 @@ async def feed(request: Request, q: str = ""):
         else:
             posts_html = "<p>No posts yet. Be the first!</p>"
 
+        # Get active polls
+        polls = db.execute("""
+            SELECT p.*, m.name as creator_name
+            FROM polls p
+            JOIN members m ON p.created_by_phone = m.phone
+            WHERE p.is_active = 1
+            ORDER BY p.created_date DESC
+            LIMIT 5
+        """).fetchall()
+
+        polls_html = ""
+        for poll in polls:
+            # Get poll options and votes
+            options = db.execute("""
+                SELECT po.id, po.option_text, po.vote_count,
+                       EXISTS(SELECT 1 FROM poll_votes WHERE poll_id = ? AND phone = ? AND option_id = po.id) as user_voted
+                FROM poll_options po
+                WHERE po.poll_id = ?
+                ORDER BY po.id
+            """, (poll["id"], phone, poll["id"])).fetchall()
+
+            # Check if user has voted
+            user_vote = db.execute(
+                "SELECT option_id FROM poll_votes WHERE poll_id = ? AND phone = ?",
+                (poll["id"], phone)
+            ).fetchone()
+
+            total_votes = sum(opt["vote_count"] for opt in options)
+
+            poll_time = format_relative_time(poll["created_date"])
+
+            options_html = ""
+            if user_vote:
+                # Show results with ability to change vote
+                for opt in options:
+                    percentage = (opt["vote_count"] / total_votes * 100) if total_votes > 0 else 0
+                    bar_width = int(percentage)
+
+                    # Make each option clickable to change vote
+                    options_html += f'''
+                    <form method="POST" action="/vote/{poll["id"]}/{opt["id"]}" style="margin: 8px 0;">
+                        <button type="submit" style="width: 100%; padding: 8px; text-align: left; background: {"rgba(40, 167, 69, 0.1)" if opt["user_voted"] else "#fff"}; color: #000; border: 1px solid {"#28a745" if opt["user_voted"] else "#ddd"}; border-radius: 4px; cursor: pointer;">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                                <span>{"✓ " if opt["user_voted"] else ""}{html.escape(opt["option_text"])}</span>
+                                <span style="font-weight: bold;">{percentage:.0f}%</span>
+                            </div>
+                            <div style="background: #eee; height: 8px; border-radius: 4px; overflow: hidden;">
+                                <div style="background: {"#28a745" if opt["user_voted"] else "#666"}; height: 100%; width: {bar_width}%;"></div>
+                            </div>
+                            <p class="small" style="margin: 4px 0 0 0;">{opt["vote_count"]} vote{"s" if opt["vote_count"] != 1 else ""}</p>
+                        </button>
+                    </form>
+                    '''
+
+                # Add undo button and total votes
+                options_html += f'''
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px;">
+                    <p class="small" style="margin: 0;">Total votes: {total_votes}</p>
+                    <form method="POST" action="/undo_vote/{poll["id"]}" style="display: inline;">
+                        <button type="submit" style="background: #666; color: #fff; padding: 6px 12px; font-size: 12px; border-radius: 4px;">Undo Vote</button>
+                    </form>
+                </div>
+                '''
+            else:
+                # Show voting buttons
+                for opt in options:
+                    options_html += f'''
+                    <form method="POST" action="/vote/{poll["id"]}/{opt["id"]}" style="margin: 8px 0;">
+                        <button type="submit" style="width: 100%; padding: 12px; text-align: left; background: #fff; color: #000; border: 1px solid #000;">
+                            {html.escape(opt["option_text"])}
+                        </button>
+                    </form>
+                    '''
+
+            polls_html += f'''
+            <div class="post" style="background: rgba(135, 206, 250, 0.1); border: 2px solid #1e90ff;">
+                <div class="post-header">
+                    <span>📊 Poll by {html.escape(poll["creator_name"])}</span>
+                    <span>{poll_time}</span>
+                </div>
+                <h3 style="margin: 10px 0;">{html.escape(poll["question"])}</h3>
+                {options_html}
+            </div>
+            '''
+
         # Get unread notification count
         unread_count = get_unread_count(phone)
         notif_badge = f' <span style="background: #e74c3c; color: #fff; padding: 2px 6px; font-size: 11px; border-radius: 10px;">{unread_count}</span>' if unread_count > 0 else ''
@@ -1518,6 +1774,7 @@ async def feed(request: Request, q: str = ""):
     }}
     </script>
 
+    {polls_html}
     {posts_html}
     """
 
@@ -1595,6 +1852,100 @@ async def react_to_post(post_id: int, emoji: str, request: Request):
                 )
 
         db.commit()
+
+    return RedirectResponse(url="/feed", status_code=303)
+
+
+@app.post("/vote/{poll_id}/{option_id}")
+async def vote_on_poll(poll_id: int, option_id: int, request: Request):
+    """Vote on a poll"""
+    cookie = request.cookies.get("clubhouse")
+    if not cookie:
+        return RedirectResponse(url="/feed", status_code=303)
+
+    phone = read_cookie(cookie)
+    if not phone:
+        return RedirectResponse(url="/feed", status_code=303)
+
+    with get_db() as db:
+        # Check if already voted
+        existing_vote = db.execute(
+            "SELECT option_id FROM poll_votes WHERE poll_id = ? AND phone = ?",
+            (poll_id, phone)
+        ).fetchone()
+
+        if existing_vote:
+            # User is changing their vote
+            old_option_id = existing_vote["option_id"]
+
+            if old_option_id != option_id:
+                # Decrement old option
+                db.execute(
+                    "UPDATE poll_options SET vote_count = vote_count - 1 WHERE id = ?",
+                    (old_option_id,)
+                )
+
+                # Update vote record
+                db.execute(
+                    "UPDATE poll_votes SET option_id = ? WHERE poll_id = ? AND phone = ?",
+                    (option_id, poll_id, phone)
+                )
+
+                # Increment new option
+                db.execute(
+                    "UPDATE poll_options SET vote_count = vote_count + 1 WHERE id = ?",
+                    (option_id,)
+                )
+        else:
+            # First time voting
+            db.execute(
+                "INSERT INTO poll_votes (poll_id, phone, option_id) VALUES (?, ?, ?)",
+                (poll_id, phone, option_id)
+            )
+
+            # Increment vote count
+            db.execute(
+                "UPDATE poll_options SET vote_count = vote_count + 1 WHERE id = ?",
+                (option_id,)
+            )
+
+        db.commit()
+
+    return RedirectResponse(url="/feed", status_code=303)
+
+
+@app.post("/undo_vote/{poll_id}")
+async def undo_vote(poll_id: int, request: Request):
+    """Remove vote from a poll"""
+    cookie = request.cookies.get("clubhouse")
+    if not cookie:
+        return RedirectResponse(url="/feed", status_code=303)
+
+    phone = read_cookie(cookie)
+    if not phone:
+        return RedirectResponse(url="/feed", status_code=303)
+
+    with get_db() as db:
+        # Get user's current vote
+        existing_vote = db.execute(
+            "SELECT option_id FROM poll_votes WHERE poll_id = ? AND phone = ?",
+            (poll_id, phone)
+        ).fetchone()
+
+        if existing_vote:
+            # Decrement vote count
+            db.execute(
+                "UPDATE poll_options SET vote_count = vote_count - 1 WHERE id = ?",
+                (existing_vote["option_id"],)
+            )
+
+            # Remove vote record
+            db.execute(
+                "DELETE FROM poll_votes WHERE poll_id = ? AND phone = ?",
+                (poll_id, phone)
+            )
+
+            db.commit()
 
     return RedirectResponse(url="/feed", status_code=303)
 
@@ -2303,6 +2654,16 @@ async def admin_panel(request: Request):
         <button type="submit">+ Create Event</button>
     </form>
 
+    <form method="POST" action="/admin/create_poll" style="margin: 30px 0; padding: 20px; border: 1px solid #000;">
+        <h3 style="margin-top: 0;">Create Poll</h3>
+        <input type="text" name="question" placeholder="Poll question" required maxlength="200">
+        <input type="text" name="option1" placeholder="Option 1" required maxlength="100">
+        <input type="text" name="option2" placeholder="Option 2" required maxlength="100">
+        <input type="text" name="option3" placeholder="Option 3 (optional)" maxlength="100">
+        <input type="text" name="option4" placeholder="Option 4 (optional)" maxlength="100">
+        <button type="submit">+ Create Poll</button>
+    </form>
+
     <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #ccc;">
         <p class="small">Moderators can pin/unpin posts and delete posts/comments.</p>
         {members_html}
@@ -2340,6 +2701,50 @@ async def create_event(
             "INSERT INTO events (title, description, event_date, start_time, end_time, max_spots) VALUES (?, ?, ?, ?, ?, ?)",
             (title, description, event_date, start_time, end_time, max_spots)
         )
+        db.commit()
+
+    return RedirectResponse(url="/admin", status_code=303)
+
+
+@app.post("/admin/create_poll")
+async def create_poll(
+    request: Request,
+    question: str = Form(...),
+    option1: str = Form(...),
+    option2: str = Form(...),
+    option3: str = Form(""),
+    option4: str = Form("")
+):
+    """Create a new poll"""
+    cookie = request.cookies.get("clubhouse")
+    if not cookie:
+        return RedirectResponse(url="/admin", status_code=303)
+
+    phone = read_cookie(cookie)
+    if not phone or not is_admin(phone):
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    # Create poll
+    with get_db() as db:
+        cursor = db.execute(
+            "INSERT INTO polls (question, created_by_phone) VALUES (?, ?)",
+            (question, phone)
+        )
+        poll_id = cursor.lastrowid
+
+        # Add options (at least 2 required)
+        options = [option1, option2]
+        if option3:
+            options.append(option3)
+        if option4:
+            options.append(option4)
+
+        for option_text in options:
+            db.execute(
+                "INSERT INTO poll_options (poll_id, option_text) VALUES (?, ?)",
+                (poll_id, option_text)
+            )
+
         db.commit()
 
     return RedirectResponse(url="/admin", status_code=303)
@@ -2505,12 +2910,186 @@ async def mark_attendance(
     return {"success": True}
 
 
+@app.post("/events/{event_id}/upload_photo")
+async def upload_event_photo(
+    event_id: int,
+    request: Request,
+    photo: UploadFile = File(...),
+    caption: str = Form("")
+):
+    """Upload a photo to an event (admin only)"""
+    cookie = request.cookies.get("clubhouse")
+    if not cookie:
+        raise HTTPException(status_code=401)
+
+    phone = read_cookie(cookie)
+    if not phone or not is_admin(phone):
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    # Validate file type
+    allowed_types = {"image/jpeg", "image/jpg", "image/png", "image/gif"}
+    if photo.content_type not in allowed_types:
+        raise HTTPException(status_code=400, detail="Only JPG, PNG, and GIF images allowed")
+
+    # Create unique filename
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    file_ext = photo.filename.split(".")[-1]
+    filename = f"event_{event_id}_{timestamp}.{file_ext}"
+    file_path = f"static/uploads/events/{filename}"
+
+    # Save file
+    with open(file_path, "wb") as f:
+        content = await photo.read()
+        f.write(content)
+
+    # Save to database
+    photo_url = f"/static/uploads/events/{filename}"
+    with get_db() as db:
+        db.execute(
+            "INSERT INTO event_photos (event_id, photo_url, caption, uploaded_by_phone) VALUES (?, ?, ?, ?)",
+            (event_id, photo_url, caption, phone)
+        )
+        db.commit()
+
+    return RedirectResponse(url="/dashboard", status_code=303)
+
+
 @app.get("/logout")
 async def logout():
     """Sign out"""
     response = RedirectResponse(url="/", status_code=303)
     response.delete_cookie("clubhouse")
     return response
+
+
+# ============ INFO PAGES ============
+
+@app.get("/contact")
+async def contact():
+    """Contact information page"""
+    email_html = ""
+    if CONTACT_EMAIL:
+        email_html = f'<p>Email us at: <a href="mailto:{CONTACT_EMAIL}">{CONTACT_EMAIL}</a></p>'
+    else:
+        email_html = '<p class="small">Contact email not configured.</p>'
+
+    content = f"""
+    <h1>Contact Us</h1>
+
+    <p>Having trouble with {SITE_NAME}? We're here to help.</p>
+
+    <h2>Common Issues</h2>
+
+    <p><strong>Didn't receive your SMS code?</strong></p>
+    <ul>
+        <li>Check your spam/blocked messages folder</li>
+        <li>Make sure you entered the correct phone number</li>
+        <li>Wait a minute and try again</li>
+    </ul>
+
+    <p><strong>Need to change your phone number?</strong></p>
+    <p>Contact an admin to update your account.</p>
+
+    <p><strong>Want to delete your account?</strong></p>
+    <p>Email us and we'll remove your data within 30 days.</p>
+
+    <h2>Get in Touch</h2>
+
+    {email_html}
+
+    <p><a href="/">← Back to home</a></p>
+    """
+    return render_html(content, f"Contact - {SITE_NAME}")
+
+
+@app.get("/privacy")
+async def privacy():
+    """Privacy policy page"""
+    email_link = f'<a href="mailto:{CONTACT_EMAIL}">{CONTACT_EMAIL}</a>' if CONTACT_EMAIL else "the site administrator"
+
+    content = f"""
+    <h1>Privacy Policy</h1>
+
+    <p class="small">Last updated: December 2024</p>
+
+    <p>{SITE_NAME} is a small, invite-only community platform. We take your privacy seriously and collect only what's necessary to run the service.</p>
+
+    <h2>What We Collect</h2>
+
+    <p><strong>Phone Number</strong></p>
+    <p>Your phone number is your identity on {SITE_NAME}. We use it to:</p>
+    <ul>
+        <li>Send you login verification codes via SMS</li>
+        <li>Send you event reminders and community updates (if enabled)</li>
+    </ul>
+
+    <p><strong>Profile Information</strong></p>
+    <p>Name, avatar, and any other info you choose to add to your profile.</p>
+
+    <p><strong>Content You Create</strong></p>
+    <p>Posts, comments, reactions, RSVPs, and other community activity.</p>
+
+    <h2>What We Don't Do</h2>
+
+    <ul>
+        <li>We don't sell your data to anyone</li>
+        <li>We don't show you ads</li>
+        <li>We don't track you across other websites</li>
+        <li>We don't share your phone number with other members (they only see your display name)</li>
+    </ul>
+
+    <h2>Data Storage</h2>
+
+    <p>Your data is stored in a database on our server. We keep regular backups to prevent data loss.</p>
+
+    <h2>Data Deletion</h2>
+
+    <p>You can request deletion of your account and all associated data at any time. Contact {email_link} and we'll process your request within 30 days.</p>
+
+    <h2>Cookies</h2>
+
+    <p>We use a single cookie to keep you logged in. It contains a secure token linked to your account and expires after 7 days of inactivity.</p>
+
+    <h2>Questions?</h2>
+
+    <p>Contact {email_link} with any privacy concerns.</p>
+
+    <p><a href="/">← Back to home</a></p>
+    """
+    return render_html(content, f"Privacy - {SITE_NAME}")
+
+
+# ============ HEALTH CHECK ============
+
+@app.get("/health")
+async def health_check():
+    """
+    Health check endpoint for monitoring.
+    Returns database status, member count, and app info.
+    """
+    try:
+        with get_db() as db:
+            member_count = db.execute("SELECT COUNT(*) as count FROM members").fetchone()["count"]
+            event_count = db.execute("SELECT COUNT(*) as count FROM events WHERE is_cancelled = 0").fetchone()["count"]
+            post_count = db.execute("SELECT COUNT(*) as count FROM posts").fetchone()["count"]
+            db_status = "ok"
+    except Exception as e:
+        member_count = 0
+        event_count = 0
+        post_count = 0
+        db_status = f"error: {str(e)}"
+
+    return JSONResponse({
+        "status": "ok" if db_status == "ok" else "degraded",
+        "database": db_status,
+        "stats": {
+            "members": member_count,
+            "events": event_count,
+            "posts": post_count,
+            "max_members": MAX_MEMBERS
+        },
+        "timestamp": datetime.now().isoformat()
+    })
 
 
 # Run with: uvicorn app:app --reload --host 0.0.0.0 --port 8000
