@@ -801,6 +801,19 @@ def render_html(content: str, title: str = "The Clubhouse") -> HTMLResponse:
 
 # ============ ROUTES ============
 
+@app.get("/debug-members")
+async def debug_members():
+    """Temporary debug route - shows stored phone numbers"""
+    with get_db() as db:
+        members = db.execute("SELECT phone, name, is_admin FROM members").fetchall()
+        if not members:
+            return {"members": [], "count": 0}
+        return {
+            "members": [{"phone": m["phone"], "name": m["name"], "is_admin": m["is_admin"]} for m in members],
+            "count": len(members)
+        }
+
+
 @app.get("/bootstrap")
 async def bootstrap():
     """First-time setup: Create admin account if database is empty"""
