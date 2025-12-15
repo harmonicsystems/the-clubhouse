@@ -424,7 +424,7 @@ def set_auth_cookie(response, phone: str):
     response.set_cookie(
         key="clubhouse",
         value=make_cookie(phone),
-        max_age=604800,  # 7 days
+        max_age=2592000,  # 30 days
         httponly=True,
         secure=PRODUCTION_MODE,  # Only send over HTTPS in production
         samesite="lax"  # Prevents CSRF while allowing normal navigation
