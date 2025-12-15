@@ -809,6 +809,9 @@ def render_html(content: str, title: str = "The Clubhouse") -> HTMLResponse:
             .nav a {{
                 white-space: nowrap;
             }}
+            .mobile-hide {{
+                display: inline;
+            }}
             @media (max-width: 600px) {{
                 body {{
                     margin: 20px auto;
@@ -819,7 +822,13 @@ def render_html(content: str, title: str = "The Clubhouse") -> HTMLResponse:
                 }}
                 .nav {{
                     font-size: 14px;
-                    gap: 6px 10px;
+                    gap: 8px 6px;
+                }}
+                .nav a {{
+                    padding: 4px 0;
+                }}
+                .mobile-hide {{
+                    display: none;
                 }}
                 button {{
                     width: 100%;
@@ -1477,8 +1486,8 @@ async def dashboard(request: Request, year: int = None, month: int = None):
         nav_html += '<a href="/dashboard">Events</a> | '
         nav_html += '<a href="/feed">Feed</a> | '
         nav_html += '<a href="/members">Members</a> | '
-        nav_html += f'<a href="/notifications">🔔 Notifications{notif_badge}</a> | '
-        nav_html += '<a href="/bookmarks">🔖 Bookmarks</a> | '
+        nav_html += f'<a href="/notifications">🔔<span class="mobile-hide"> Notifications</span>{notif_badge}</a> | '
+        nav_html += '<a href="/bookmarks">🔖<span class="mobile-hide"> Bookmarks</span></a> | '
         if member["is_admin"]:
             nav_html += '<a href="/admin">Admin</a> | '
         nav_html += '<a href="/logout">Sign out</a>'
@@ -1890,7 +1899,12 @@ async def feed(request: Request, q: str = ""):
                 </div>
                 """
         else:
-            posts_html = "<p>No posts yet. Be the first!</p>"
+            posts_html = """
+            <div style="text-align: center; padding: 40px 20px; color: #666;">
+                <p style="font-size: 18px;">No posts yet</p>
+                <p>Be the first to start a conversation!</p>
+            </div>
+            """
 
         # Get active polls
         polls = db.execute("""
@@ -1989,8 +2003,8 @@ async def feed(request: Request, q: str = ""):
         nav_html += '<a href="/dashboard">Events</a> | '
         nav_html += '<a href="/feed">Feed</a> | '
         nav_html += '<a href="/members">Members</a> | '
-        nav_html += f'<a href="/notifications">🔔 Notifications{notif_badge}</a> | '
-        nav_html += '<a href="/bookmarks">🔖 Bookmarks</a> | '
+        nav_html += f'<a href="/notifications">🔔<span class="mobile-hide"> Notifications</span>{notif_badge}</a> | '
+        nav_html += '<a href="/bookmarks">🔖<span class="mobile-hide"> Bookmarks</span></a> | '
         if member["is_admin"]:
             nav_html += '<a href="/admin">Admin</a> | '
         nav_html += '<a href="/logout">Sign out</a>'
@@ -2018,8 +2032,10 @@ async def feed(request: Request, q: str = ""):
     <form method="POST" action="/post" style="margin-bottom: 30px;">
         <input type="hidden" name="csrf_token" value="{csrf_token}">
         <textarea id="post-textarea" name="content" placeholder="What's on your mind?" rows="3" required maxlength="500" oninput="updateCharCount()"></textarea>
-        <p class="small"><span id="char-count">0</span>/500 characters</p>
-        <button type="submit">Post</button>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px;">
+            <span class="small"><span id="char-count">0</span>/500 characters</span>
+            <button type="submit" style="margin: 0; width: auto;">Post</button>
+        </div>
     </form>
 
     <script>
@@ -2304,8 +2320,8 @@ async def bookmarks_page(request: Request):
         nav_html += '<a href="/dashboard">Events</a> | '
         nav_html += '<a href="/feed">Feed</a> | '
         nav_html += '<a href="/members">Members</a> | '
-        nav_html += f'<a href="/notifications">🔔 Notifications{notif_badge}</a> | '
-        nav_html += '<a href="/bookmarks">🔖 Bookmarks</a> | '
+        nav_html += f'<a href="/notifications">🔔<span class="mobile-hide"> Notifications</span>{notif_badge}</a> | '
+        nav_html += '<a href="/bookmarks">🔖<span class="mobile-hide"> Bookmarks</span></a> | '
         if member["is_admin"]:
             nav_html += '<a href="/admin">Admin</a> | '
         nav_html += '<a href="/logout">Sign out</a>'
@@ -2527,7 +2543,7 @@ async def notifications_page(request: Request):
     nav_html += '<a href="/dashboard">Events</a> | '
     nav_html += '<a href="/feed">Feed</a> | '
     nav_html += '<a href="/members">Members</a> | '
-    nav_html += f'<a href="/notifications">🔔 Notifications{notif_badge}</a> | '
+    nav_html += f'<a href="/notifications">🔔<span class="mobile-hide"> Notifications</span>{notif_badge}</a> | '
     if member["is_admin"]:
         nav_html += '<a href="/admin">Admin</a> | '
     nav_html += '<a href="/logout">Sign out</a>'
@@ -2582,7 +2598,7 @@ async def profile_page(request: Request):
     nav_html += '<a href="/dashboard">Events</a> | '
     nav_html += '<a href="/feed">Feed</a> | '
     nav_html += '<a href="/members">Members</a> | '
-    nav_html += f'<a href="/notifications">🔔 Notifications{notif_badge}</a> | '
+    nav_html += f'<a href="/notifications">🔔<span class="mobile-hide"> Notifications</span>{notif_badge}</a> | '
     if member["is_admin"]:
         nav_html += '<a href="/admin">Admin</a> | '
     nav_html += '<a href="/logout">Sign out</a>'
@@ -2773,7 +2789,7 @@ async def members_directory(request: Request):
     nav_html += '<a href="/dashboard">Events</a> | '
     nav_html += '<a href="/feed">Feed</a> | '
     nav_html += '<a href="/members">Members</a> | '
-    nav_html += '<a href="/bookmarks">🔖 Bookmarks</a> | '
+    nav_html += '<a href="/bookmarks">🔖<span class="mobile-hide"> Bookmarks</span></a> | '
     if member["is_admin"]:
         nav_html += '<a href="/admin">Admin</a> | '
     nav_html += '<a href="/logout">Sign out</a>'
