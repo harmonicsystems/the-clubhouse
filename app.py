@@ -1016,44 +1016,36 @@ def render_html(content: str, title: str = "The Clubhouse") -> HTMLResponse:
             top: 0;
             left: 0;
             right: 0;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 8px 15px;
-            font-size: 13px;
+            background: #333;
+            color: #aaa;
+            padding: 4px 12px;
+            font-size: 11px;
             z-index: 9999;
             display: flex;
-            justify-content: space-between;
+            justify-content: center;
             align-items: center;
-            flex-wrap: wrap;
-            gap: 10px;
+            gap: 12px;
             font-family: -apple-system, BlinkMacSystemFont, sans-serif;
         ">
-            <div>
-                <strong>🧪 Demo Mode</strong>
-                <span style="opacity: 0.9; margin-left: 10px;">Viewing as: <span id="view-mode-label" style="font-weight: bold;">Admin</span></span>
-            </div>
-            <div style="display: flex; gap: 8px; align-items: center;">
-                <span style="opacity: 0.8; font-size: 12px;">Switch view:</span>
-                <button onclick="setViewMode(false)" id="btn-admin" style="
-                    padding: 4px 12px;
-                    border: 2px solid white;
-                    background: white;
-                    color: #764ba2;
-                    font-weight: bold;
-                    cursor: pointer;
-                    font-size: 12px;
-                ">👑 Admin</button>
-                <button onclick="setViewMode(true)" id="btn-member" style="
-                    padding: 4px 12px;
-                    border: 2px solid white;
-                    background: transparent;
-                    color: white;
-                    cursor: pointer;
-                    font-size: 12px;
-                ">👤 Member</button>
-            </div>
+            <span>Demo</span>
+            <button onclick="setViewMode(false)" id="btn-admin" style="
+                padding: 2px 8px;
+                border: 1px solid #666;
+                background: #555;
+                color: white;
+                cursor: pointer;
+                font-size: 11px;
+            ">Admin</button>
+            <button onclick="setViewMode(true)" id="btn-member" style="
+                padding: 2px 8px;
+                border: 1px solid #666;
+                background: transparent;
+                color: #aaa;
+                cursor: pointer;
+                font-size: 11px;
+            ">Member</button>
         </div>
-        <div style="height: 50px;"></div>
+        <div style="height: 28px;"></div>
         <script>
             function getCookie(name) {{
                 const value = "; " + document.cookie;
@@ -1072,18 +1064,14 @@ def render_html(content: str, title: str = "The Clubhouse") -> HTMLResponse:
             // Update toolbar based on current view mode
             (function() {{
                 const isViewingAsMember = getCookie("view_as_member") === "1";
-                const label = document.getElementById("view-mode-label");
                 const btnAdmin = document.getElementById("btn-admin");
                 const btnMember = document.getElementById("btn-member");
 
                 if (isViewingAsMember) {{
-                    label.textContent = "Member";
                     btnAdmin.style.background = "transparent";
-                    btnAdmin.style.color = "white";
-                    btnMember.style.background = "white";
-                    btnMember.style.color = "#764ba2";
-                    btnMember.style.fontWeight = "bold";
-                    btnAdmin.style.fontWeight = "normal";
+                    btnAdmin.style.color = "#aaa";
+                    btnMember.style.background = "#555";
+                    btnMember.style.color = "white";
                 }}
             }})();
         </script>
@@ -1821,18 +1809,6 @@ async def dashboard(request: Request, year: int = None, month: int = None):
         # Check if admin is viewing as member
         viewing_as_member = member["is_admin"] and request.cookies.get("view_as_member") == "1"
 
-        # Banner for member view mode
-        view_mode_banner = ""
-        if viewing_as_member:
-            view_mode_banner = """
-            <div style="background: #fff3cd; border: 1px solid #ffc107; padding: 10px 15px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;">
-                <span>👁️ Viewing as regular member (admin controls hidden)</span>
-                <form method="POST" action="/admin/view_as_admin" style="margin: 0;">
-                    <button type="submit" style="background: #666; padding: 5px 10px; font-size: 12px; margin: 0;">Return to Admin View</button>
-                </form>
-            </div>
-            """
-
         nav_html = '<div class="nav">'
         nav_html += f'<a href="/profile"><span style="font-size: 16px; margin-right: 4px;">{user_avatar}</span><strong>{html.escape(user_display_name)}</strong></a> | '
         nav_html += '<a href="/dashboard">Events</a> | '
@@ -1868,7 +1844,6 @@ async def dashboard(request: Request, year: int = None, month: int = None):
 
     content = f"""
     {nav_html}
-    {view_mode_banner}
 
     <p class="small" style="margin-bottom: -10px;"><span id="greeting">Hello</span>, {html.escape(member["name"])}</p>
     <h1>{SITE_NAME}{event_count_text}</h1>
@@ -2180,7 +2155,7 @@ async def feed(request: Request, q: str = ""):
 
                         # Moderator/Admin delete button
                         comment_delete = ""
-                        if is_moderator_or_admin(member):
+                        if is_moderator_or_admin(member) and not viewing_as_member:
                             comment_delete = f'''
                             <form method="POST" action="/delete_comment/{comment['id']}" style="display: inline; margin-left: 5px;">
                                 <button type="submit" onclick="return confirm('Delete?')" style="background: #d00; color: white; padding: 2px 6px; font-size: 11px;">🗑️</button>
@@ -2215,7 +2190,7 @@ async def feed(request: Request, q: str = ""):
 
                 # Moderator/Admin controls
                 mod_controls = ""
-                if is_moderator_or_admin(member):
+                if is_moderator_or_admin(member) and not viewing_as_member:
                     pin_button = ""
                     if post["is_pinned"]:
                         pin_button = f'''
@@ -2368,18 +2343,6 @@ async def feed(request: Request, q: str = ""):
         # Check if admin is viewing as member
         viewing_as_member = member["is_admin"] and request.cookies.get("view_as_member") == "1"
 
-        # Banner for member view mode
-        view_mode_banner = ""
-        if viewing_as_member:
-            view_mode_banner = """
-            <div style="background: #fff3cd; border: 1px solid #ffc107; padding: 10px 15px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;">
-                <span>👁️ Viewing as regular member (admin controls hidden)</span>
-                <form method="POST" action="/admin/view_as_admin" style="margin: 0;">
-                    <button type="submit" style="background: #666; padding: 5px 10px; font-size: 12px; margin: 0;">Return to Admin View</button>
-                </form>
-            </div>
-            """
-
         nav_html = '<div class="nav">'
         nav_html += f'<a href="/profile"><span style="font-size: 16px; margin-right: 4px;">{user_avatar}</span><strong>{html.escape(user_display_name)}</strong></a> | '
         nav_html += '<a href="/dashboard">Events</a> | '
@@ -2407,7 +2370,6 @@ async def feed(request: Request, q: str = ""):
 
     content = f"""
     {nav_html}
-    {view_mode_banner}
 
     <h1>📝 Community Feed</h1>
 
