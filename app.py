@@ -344,6 +344,28 @@ def format_phone(phone: str) -> str:
     return phone
 
 
+def get_greeting() -> str:
+    """Return time-appropriate greeting"""
+    hour = datetime.now().hour
+    if hour < 12:
+        return "Good morning"
+    elif hour < 17:
+        return "Good afternoon"
+    elif hour < 21:
+        return "Good evening"
+    else:
+        return "Good night"
+
+
+def format_member_since(joined_date: str) -> str:
+    """Format join date as 'Member since Dec 2024'"""
+    try:
+        dt = datetime.strptime(joined_date[:10], "%Y-%m-%d")
+        return f"Member since {dt.strftime('%b %Y')}"
+    except:
+        return ""
+
+
 def send_sms(phone: str, message: str) -> bool:
     """Send a text message"""
     try:
@@ -1510,10 +1532,13 @@ async def dashboard(request: Request, year: int = None, month: int = None):
     if len(events) > 0:
         event_count_text = f" <span class='small' style='color: #666;'>({len(events)} upcoming)</span>"
 
+    greeting = get_greeting()
+
     content = f"""
     {nav_html}
 
-    <h1>The Feed and Seed{event_count_text}</h1>
+    <p class="small" style="margin-bottom: -10px;">{greeting}, {html.escape(member["name"])}</p>
+    <h1>{SITE_NAME}{event_count_text}</h1>
 
     {calendar_html}
 
@@ -2604,19 +2629,21 @@ async def profile_page(request: Request):
     nav_html += '<a href="/logout">Sign out</a>'
     nav_html += '</div>'
 
+    greeting = get_greeting()
+    member_since = format_member_since(member["joined_date"])
+
     content = f"""
     {nav_html}
 
-    <h1>👤 Profile</h1>
+    <h1>{greeting}, {html.escape(member["name"])}!</h1>
+    <p class="small" style="margin-top: -20px; margin-bottom: 20px;">{member_since}</p>
 
     <div class="event">
         <h3>Your Info</h3>
         <p><strong>Avatar:</strong> <span style="font-size: 48px;">{avatar}</span></p>
         <p><strong>Handle:</strong> @{html.escape(handle)}</p>
         <p><strong>Display Name:</strong> {html.escape(display_name)}</p>
-        <p><strong>Original Name:</strong> {html.escape(member["name"])}</p>
         <p><strong>Phone:</strong> {format_phone(phone)}</p>
-        <p><strong>Joined:</strong> {member["joined_date"][:10]}</p>
         <p><strong>Birthday:</strong> {birthday if birthday else "Not set"}</p>
     </div>
 
