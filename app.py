@@ -146,6 +146,12 @@ def init_database():
         except:
             pass  # Column already exists
 
+        # Add first_login column for welcome tour
+        try:
+            db.execute("ALTER TABLE members ADD COLUMN first_login BOOLEAN DEFAULT 1")
+        except:
+            pass  # Column already exists
+
         # Events table
         db.execute("""
             CREATE TABLE IF NOT EXISTS events (
@@ -796,6 +802,14 @@ def render_html(content: str, title: str = "The Clubhouse") -> HTMLResponse:
                 font-size: 12px;
                 color: var(--color-text-muted);
             }}
+            .hint {{
+                background: #fffde7;
+                border-left: 3px solid #ffc107;
+                padding: 10px 15px;
+                margin: 15px 0;
+                font-size: 13px;
+                color: #666;
+            }}
             .error {{
                 color: #c00;
                 margin: 10px 0;
@@ -868,8 +882,20 @@ def render_html(content: str, title: str = "The Clubhouse") -> HTMLResponse:
             }}
         </style>
         <script>
-            // Prevent double-submit on all forms
             document.addEventListener('DOMContentLoaded', function() {{
+                // Update greeting based on user's local timezone
+                var greetingEl = document.getElementById('greeting');
+                if (greetingEl) {{
+                    var hour = new Date().getHours();
+                    var greeting = "Hello";
+                    if (hour < 12) greeting = "Good morning";
+                    else if (hour < 17) greeting = "Good afternoon";
+                    else if (hour < 21) greeting = "Good evening";
+                    else greeting = "Good night";
+                    greetingEl.textContent = greeting;
+                }}
+
+                // Prevent double-submit on all forms
                 document.querySelectorAll('form').forEach(function(form) {{
                     form.addEventListener('submit', function() {{
                         var btn = form.querySelector('button[type="submit"], button:not([type])');
@@ -959,8 +985,8 @@ async def bootstrap_create(name: str = Form(...), phone: str = Form(...)):
 
         db.commit()
 
-    # Log them in
-    response = RedirectResponse(url="/dashboard", status_code=303)
+    # Log them in and show welcome tour
+    response = RedirectResponse(url="/welcome", status_code=303)
     set_auth_cookie(response, phone)
     return response
 
@@ -1002,7 +1028,7 @@ async def home(request: Request):
     <p class="small">This is a private community. Invite codes only.</p>
 
     <hr style="margin-top: 40px; border: none; border-top: 1px solid var(--color-border-light);">
-    <p class="small"><a href="/contact">Contact</a> · <a href="/privacy">Privacy</a></p>
+    <p class="small"><a href="/help">Help</a> · <a href="/contact">Contact</a> · <a href="/privacy">Privacy</a></p>
     """
     return render_html(content)
 
@@ -1185,9 +1211,71 @@ async def register(invite_code: str = Form(...), name: str = Form(...), phone: s
     message = f"Welcome to {SITE_NAME}, {name}!"
     send_sms(phone, message)
 
-    response = RedirectResponse(url="/dashboard", status_code=303)
+    # New users go to welcome tour
+    response = RedirectResponse(url="/welcome", status_code=303)
     set_auth_cookie(response, phone)
     return response
+
+
+@app.get("/welcome")
+async def welcome_tour(request: Request):
+    """Welcome page for first-time users"""
+    cookie = request.cookies.get("clubhouse")
+    if not cookie:
+        return RedirectResponse(url="/", status_code=303)
+
+    phone = read_cookie(cookie)
+    if not phone:
+        return RedirectResponse(url="/", status_code=303)
+
+    with get_db() as db:
+        member = db.execute("SELECT name, first_login FROM members WHERE phone = ?", (phone,)).fetchone()
+        if not member:
+            return RedirectResponse(url="/", status_code=303)
+
+        # Mark welcome as seen
+        db.execute("UPDATE members SET first_login = 0 WHERE phone = ?", (phone,))
+        db.commit()
+
+    content = f"""
+    <h1>Welcome to {SITE_NAME}! 🎉</h1>
+
+    <p style="font-size: 18px;">Hey {html.escape(member["name"])}, you're in! Here's what you can do:</p>
+
+    <div class="event" style="margin: 20px 0;">
+        <h3>📅 Events</h3>
+        <p>See what's happening and RSVP to community gatherings. This is your main dashboard.</p>
+    </div>
+
+    <div class="event" style="margin: 20px 0;">
+        <h3>📝 Feed</h3>
+        <p>Share updates, thoughts, and questions with the community. React with emoji and comment on posts.</p>
+    </div>
+
+    <div class="event" style="margin: 20px 0;">
+        <h3>👥 Members</h3>
+        <p>See who's in the community. Set your status to let others know if you're available to chat.</p>
+    </div>
+
+    <div class="event" style="margin: 20px 0;">
+        <h3>🔔 Notifications</h3>
+        <p>Get notified when someone reacts to or comments on your posts.</p>
+    </div>
+
+    <div style="background: #f5f5f5; padding: 20px; margin: 30px 0; text-align: center;">
+        <p style="margin: 0 0 15px 0;"><strong>First thing to do:</strong> Set up your profile!</p>
+        <p style="margin: 0;">Pick an avatar emoji and customize your display name.</p>
+    </div>
+
+    <div style="text-align: center; margin-top: 30px;">
+        <a href="/profile" style="display: inline-block; padding: 15px 30px; background: #000; color: #fff; text-decoration: none; margin-right: 10px;">Set Up Profile →</a>
+        <a href="/dashboard" style="display: inline-block; padding: 15px 30px; border: 1px solid #000; text-decoration: none;">Skip to Events</a>
+    </div>
+
+    <p class="small" style="text-align: center; margin-top: 20px;">Need help? Click the <strong>?</strong> in the navigation bar anytime.</p>
+    """
+
+    return render_html(content, f"Welcome to {SITE_NAME}")
 
 
 @app.get("/dashboard")
@@ -1397,7 +1485,7 @@ async def dashboard(request: Request, year: int = None, month: int = None):
         calendar_html += """
             </tbody>
         </table>
-        <p class="small">Events you're attending are highlighted in green. Today is highlighted in yellow.</p>
+        <p class="hint">💡 <strong>Tip:</strong> Click an event on the calendar to jump to it below. Green = you're going. Yellow = today.</p>
         """
 
         # Get upcoming events list
@@ -1494,7 +1582,21 @@ async def dashboard(request: Request, year: int = None, month: int = None):
             """
 
         if not events_html:
-            events_html = "<p>No upcoming events. Check back soon!</p>"
+            if member["is_admin"]:
+                events_html = """
+                <div style="text-align: center; padding: 30px 20px; color: #666; border: 1px dashed #ccc;">
+                    <p style="font-size: 18px;">No upcoming events</p>
+                    <p>Ready to bring the community together?</p>
+                    <p><a href="/admin">Create an event in the Admin Panel →</a></p>
+                </div>
+                """
+            else:
+                events_html = """
+                <div style="text-align: center; padding: 30px 20px; color: #666; border: 1px dashed #ccc;">
+                    <p style="font-size: 18px;">No upcoming events</p>
+                    <p>Check back soon for community gatherings!</p>
+                </div>
+                """
 
         # Get unread notification count
         unread_count = get_unread_count(phone)
@@ -1503,6 +1605,21 @@ async def dashboard(request: Request, year: int = None, month: int = None):
         user_avatar = member["avatar"] or "👤"
         user_display_name = member["display_name"] or member["name"]
 
+        # Check if admin is viewing as member
+        viewing_as_member = member["is_admin"] and request.cookies.get("view_as_member") == "1"
+
+        # Banner for member view mode
+        view_mode_banner = ""
+        if viewing_as_member:
+            view_mode_banner = """
+            <div style="background: #fff3cd; border: 1px solid #ffc107; padding: 10px 15px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;">
+                <span>👁️ Viewing as regular member (admin controls hidden)</span>
+                <form method="POST" action="/admin/view_as_admin" style="margin: 0;">
+                    <button type="submit" style="background: #666; padding: 5px 10px; font-size: 12px; margin: 0;">Return to Admin View</button>
+                </form>
+            </div>
+            """
+
         nav_html = '<div class="nav">'
         nav_html += f'<a href="/profile"><span style="font-size: 16px; margin-right: 4px;">{user_avatar}</span><strong>{html.escape(user_display_name)}</strong></a> | '
         nav_html += '<a href="/dashboard">Events</a> | '
@@ -1510,20 +1627,24 @@ async def dashboard(request: Request, year: int = None, month: int = None):
         nav_html += '<a href="/members">Members</a> | '
         nav_html += f'<a href="/notifications">🔔<span class="mobile-hide"> Notifications</span>{notif_badge}</a> | '
         nav_html += '<a href="/bookmarks">🔖<span class="mobile-hide"> Bookmarks</span></a> | '
-        if member["is_admin"]:
+        if member["is_admin"] and not viewing_as_member:
             nav_html += '<a href="/admin">Admin</a> | '
-        nav_html += '<a href="/logout">Sign out</a>'
+        nav_html += '<a href="/logout">Sign out</a> | '
+        nav_html += '<a href="/help">?</a>'
         nav_html += '</div>'
 
         invite_html = """
         <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #ccc;">
-            <h3>Invite Someone</h3>
-            <p class="small">Enter their phone number and we'll text them an invite.</p>
-            <form method="POST" action="/send_invite">
-                <input type="tel" name="invite_phone" placeholder="(555) 555-5555" required style="margin-bottom: 10px;">
-                <button type="submit">Send Invite Text</button>
+            <h3>👋 Know someone who'd fit in?</h3>
+            <p>Send them an invite to join the community!</p>
+            <form method="POST" action="/send_invite" style="margin: 15px 0;">
+                <input type="tel" name="invite_phone" placeholder="Their phone number" required style="margin-bottom: 10px;">
+                <button type="submit">📱 Send Invite via Text</button>
             </form>
-            <p class="small" style="margin-top: 15px;">Or <a href="/create_invite">generate a code</a> to share yourself.</p>
+            <details style="margin-top: 15px;">
+                <summary style="cursor: pointer; color: #666;">Or share a code manually →</summary>
+                <p style="margin-top: 10px;"><a href="/create_invite" style="display: inline-block; padding: 8px 16px; background: #f0f0f0; text-decoration: none;">Generate Invite Code</a></p>
+            </details>
         </div>
         """
 
@@ -1532,12 +1653,11 @@ async def dashboard(request: Request, year: int = None, month: int = None):
     if len(events) > 0:
         event_count_text = f" <span class='small' style='color: #666;'>({len(events)} upcoming)</span>"
 
-    greeting = get_greeting()
-
     content = f"""
     {nav_html}
+    {view_mode_banner}
 
-    <p class="small" style="margin-bottom: -10px;">{greeting}, {html.escape(member["name"])}</p>
+    <p class="small" style="margin-bottom: -10px;"><span id="greeting">Hello</span>, {html.escape(member["name"])}</p>
     <h1>{SITE_NAME}{event_count_text}</h1>
 
     {calendar_html}
@@ -1637,16 +1757,25 @@ async def create_invite(request: Request):
     join_url = f"{SITE_URL}/join/{code}" if SITE_URL else f"/join/{code}"
 
     content = f"""
-    <h1>Invite Code Created!</h1>
+    <h1>🎉 Invite Code Created!</h1>
 
-    <p>Share this with someone you'd like to invite:</p>
+    <p>Share these instructions with your friend:</p>
 
-    <div style="background: #f0f0f0; padding: 20px; margin: 20px 0;">
-        <p><strong>Code:</strong> {code}</p>
-        <p><strong>Link:</strong> <a href="/join/{code}">{join_url}</a></p>
+    <div style="background: #f5f5f5; padding: 20px; margin: 20px 0; border-left: 4px solid #000;">
+        <p style="margin: 0 0 15px 0;"><strong>How to join:</strong></p>
+        <ol style="margin: 0; padding-left: 20px; line-height: 1.8;">
+            <li>Go to: <strong>{join_url}</strong></li>
+            <li>Enter your name and phone number</li>
+            <li>You're in!</li>
+        </ol>
     </div>
 
-    <p class="small">This code can only be used once.</p>
+    <div style="background: #fffde7; padding: 15px; margin: 20px 0;">
+        <p style="margin: 0;"><strong>Or just share the code:</strong> <span style="font-size: 20px; font-weight: bold;">{code}</span></p>
+        <p class="small" style="margin: 10px 0 0 0;">They can enter this at the homepage.</p>
+    </div>
+
+    <p class="small">⚠️ This code can only be used once and expires after use.</p>
 
     <a href="/dashboard">← Back to dashboard</a>
     """
@@ -2023,6 +2152,21 @@ async def feed(request: Request, q: str = ""):
         user_avatar = member["avatar"] or "👤"
         user_display_name = member["display_name"] or member["name"]
 
+        # Check if admin is viewing as member
+        viewing_as_member = member["is_admin"] and request.cookies.get("view_as_member") == "1"
+
+        # Banner for member view mode
+        view_mode_banner = ""
+        if viewing_as_member:
+            view_mode_banner = """
+            <div style="background: #fff3cd; border: 1px solid #ffc107; padding: 10px 15px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;">
+                <span>👁️ Viewing as regular member (admin controls hidden)</span>
+                <form method="POST" action="/admin/view_as_admin" style="margin: 0;">
+                    <button type="submit" style="background: #666; padding: 5px 10px; font-size: 12px; margin: 0;">Return to Admin View</button>
+                </form>
+            </div>
+            """
+
         nav_html = '<div class="nav">'
         nav_html += f'<a href="/profile"><span style="font-size: 16px; margin-right: 4px;">{user_avatar}</span><strong>{html.escape(user_display_name)}</strong></a> | '
         nav_html += '<a href="/dashboard">Events</a> | '
@@ -2030,9 +2174,10 @@ async def feed(request: Request, q: str = ""):
         nav_html += '<a href="/members">Members</a> | '
         nav_html += f'<a href="/notifications">🔔<span class="mobile-hide"> Notifications</span>{notif_badge}</a> | '
         nav_html += '<a href="/bookmarks">🔖<span class="mobile-hide"> Bookmarks</span></a> | '
-        if member["is_admin"]:
+        if member["is_admin"] and not viewing_as_member:
             nav_html += '<a href="/admin">Admin</a> | '
-        nav_html += '<a href="/logout">Sign out</a>'
+        nav_html += '<a href="/logout">Sign out</a> | '
+        nav_html += '<a href="/help">?</a>'
         nav_html += '</div>'
 
         csrf_token = get_csrf_token(phone)
@@ -2049,6 +2194,7 @@ async def feed(request: Request, q: str = ""):
 
     content = f"""
     {nav_html}
+    {view_mode_banner}
 
     <h1>📝 Community Feed</h1>
 
@@ -2331,7 +2477,13 @@ async def bookmarks_page(request: Request):
                 </div>
                 """
         else:
-            posts_html = "<p>No bookmarks yet. Bookmark posts from the feed to save them here!</p>"
+            posts_html = """
+            <div style="text-align: center; padding: 30px 20px; color: #666; border: 1px dashed #ccc;">
+                <p style="font-size: 18px;">No bookmarks yet</p>
+                <p>Bookmark posts from the feed by clicking 🔖 to save them here.</p>
+                <p><a href="/feed">Go to the Feed →</a></p>
+            </div>
+            """
 
         # Get unread notification count
         unread_count = get_unread_count(phone)
@@ -2349,7 +2501,8 @@ async def bookmarks_page(request: Request):
         nav_html += '<a href="/bookmarks">🔖<span class="mobile-hide"> Bookmarks</span></a> | '
         if member["is_admin"]:
             nav_html += '<a href="/admin">Admin</a> | '
-        nav_html += '<a href="/logout">Sign out</a>'
+        nav_html += '<a href="/logout">Sign out</a> | '
+        nav_html += '<a href="/help">?</a>'
         nav_html += '</div>'
 
     content = f"""
@@ -2554,7 +2707,13 @@ async def notifications_page(request: Request):
             </div>
             """
     else:
-        notifs_html = "<p>No notifications yet. You'll see updates here when someone interacts with your posts!</p>"
+        notifs_html = """
+        <div style="text-align: center; padding: 30px 20px; color: #666; border: 1px dashed #ccc;">
+            <p style="font-size: 18px;">All caught up!</p>
+            <p>Notifications appear when someone reacts to or comments on your posts.</p>
+            <p><a href="/feed">Go to the Feed →</a></p>
+        </div>
+        """
 
     # Get unread notification count
     unread_count = 0  # Just marked all as read
@@ -2571,7 +2730,8 @@ async def notifications_page(request: Request):
     nav_html += f'<a href="/notifications">🔔<span class="mobile-hide"> Notifications</span>{notif_badge}</a> | '
     if member["is_admin"]:
         nav_html += '<a href="/admin">Admin</a> | '
-    nav_html += '<a href="/logout">Sign out</a>'
+    nav_html += '<a href="/logout">Sign out</a> | '
+    nav_html += '<a href="/help">?</a>'
     nav_html += '</div>'
 
     content = f"""
@@ -2626,16 +2786,16 @@ async def profile_page(request: Request):
     nav_html += f'<a href="/notifications">🔔<span class="mobile-hide"> Notifications</span>{notif_badge}</a> | '
     if member["is_admin"]:
         nav_html += '<a href="/admin">Admin</a> | '
-    nav_html += '<a href="/logout">Sign out</a>'
+    nav_html += '<a href="/logout">Sign out</a> | '
+    nav_html += '<a href="/help">?</a>'
     nav_html += '</div>'
 
-    greeting = get_greeting()
     member_since = format_member_since(member["joined_date"])
 
     content = f"""
     {nav_html}
 
-    <h1>{greeting}, {html.escape(member["name"])}!</h1>
+    <h1><span id="greeting">Hello</span>, {html.escape(member["name"])}!</h1>
     <p class="small" style="margin-top: -20px; margin-bottom: 20px;">{member_since}</p>
 
     <div class="event">
@@ -2656,6 +2816,7 @@ async def profile_page(request: Request):
             <input type="hidden" id="avatar-input" name="avatar" value="{avatar}">
             <button type="submit" style="margin-top: 10px;">Save Avatar</button>
         </form>
+        <p class="hint" style="margin-top: 15px;">💡 Your avatar appears next to your posts and comments in the feed.</p>
     </div>
 
     <div class="event">
@@ -2819,7 +2980,8 @@ async def members_directory(request: Request):
     nav_html += '<a href="/bookmarks">🔖<span class="mobile-hide"> Bookmarks</span></a> | '
     if member["is_admin"]:
         nav_html += '<a href="/admin">Admin</a> | '
-    nav_html += '<a href="/logout">Sign out</a>'
+    nav_html += '<a href="/logout">Sign out</a> | '
+    nav_html += '<a href="/help">?</a>'
     nav_html += '</div>'
 
     # Get current user status
@@ -2840,6 +3002,8 @@ async def members_directory(request: Request):
             <button type="submit">Update Status</button>
         </form>
     </div>
+
+    <p class="hint">💡 Status dots show availability: 🟢 = available for chat, 🟡 = away, 🔴 = busy. Set yours above!</p>
 
     {members_list}
     """
@@ -2973,6 +3137,14 @@ async def admin_panel(request: Request):
         <p class="small">Moderators can pin/unpin posts and delete posts/comments.</p>
         {members_html}
     </div>
+
+    <div style="margin-top: 30px; padding: 20px; background: #f0f8ff; border-left: 4px solid #007bff;">
+        <h3 style="margin-top: 0;">👁️ View as Member</h3>
+        <p class="small">See what the site looks like for regular members (hides admin controls).</p>
+        <form method="POST" action="/admin/view_as_member">
+            <button type="submit" style="background: #007bff;">Switch to Member View</button>
+        </form>
+    </div>
     """
 
     return render_html(content)
@@ -3094,6 +3266,50 @@ async def demote_moderator(member_phone: str, request: Request):
         db.commit()
 
     return RedirectResponse(url="/admin", status_code=303)
+
+
+@app.post("/admin/view_as_member")
+async def view_as_member(request: Request):
+    """Toggle to member view mode"""
+    cookie = request.cookies.get("clubhouse")
+    if not cookie:
+        return RedirectResponse(url="/", status_code=303)
+
+    phone = read_cookie(cookie)
+    if not phone or not is_admin(phone):
+        return RedirectResponse(url="/", status_code=303)
+
+    # Set the view mode cookie and redirect to dashboard
+    response = RedirectResponse(url="/dashboard", status_code=303)
+    response.set_cookie(
+        key="view_as_member",
+        value="1",
+        max_age=3600,  # 1 hour
+        httponly=True
+    )
+    return response
+
+
+@app.post("/admin/view_as_admin")
+async def view_as_admin(request: Request):
+    """Toggle back to admin view mode"""
+    cookie = request.cookies.get("clubhouse")
+    if not cookie:
+        return RedirectResponse(url="/", status_code=303)
+
+    phone = read_cookie(cookie)
+    if not phone or not is_admin(phone):
+        return RedirectResponse(url="/", status_code=303)
+
+    # Clear the view mode cookie and redirect to dashboard
+    response = RedirectResponse(url="/dashboard", status_code=303)
+    response.delete_cookie("view_as_member")
+    return response
+
+
+def is_viewing_as_member(request: Request) -> bool:
+    """Check if admin is currently viewing as member"""
+    return request.cookies.get("view_as_member") == "1"
 
 
 @app.get("/attendance/{event_id}")
@@ -3362,6 +3578,92 @@ async def privacy():
     <p><a href="/">← Back to home</a></p>
     """
     return render_html(content, f"Privacy - {SITE_NAME}")
+
+
+@app.get("/help")
+async def help_page():
+    """Help and FAQ page"""
+    content = f"""
+    <h1>How to use {SITE_NAME}</h1>
+
+    <p>Welcome! Here's everything you need to know about using this community platform.</p>
+
+    <h2>Getting Around</h2>
+
+    <div class="event">
+        <p><strong>📅 Events</strong> - Your main dashboard. See the calendar and upcoming events.</p>
+        <p><strong>📝 Feed</strong> - Community message board where members share updates.</p>
+        <p><strong>👥 Members</strong> - See everyone in the community and their profiles.</p>
+        <p><strong>🔔 Notifications</strong> - Get notified when someone reacts to or comments on your posts.</p>
+        <p><strong>🔖 Bookmarks</strong> - Save posts to come back to later.</p>
+    </div>
+
+    <h2>What You Can Do</h2>
+
+    <div class="event">
+        <p><strong>RSVP to events</strong> - Click an event to see details and say you're coming.</p>
+        <p><strong>Post updates</strong> - Share thoughts, questions, or announcements (500 characters max).</p>
+        <p><strong>React with emoji</strong> - Show appreciation with 👍 ❤️ 😂 🎉 🔥</p>
+        <p><strong>Comment on posts</strong> - Join conversations and reply to others.</p>
+        <p><strong>Bookmark posts</strong> - Click the 🔖 to save a post for later.</p>
+        <p><strong>Invite new members</strong> - Generate invite codes to bring friends into the community.</p>
+    </div>
+
+    <h2>Your Profile</h2>
+
+    <div class="event">
+        <p><strong>Avatar</strong> - Pick an emoji that appears next to your posts.</p>
+        <p><strong>Display Name</strong> - The name others see (you can change it anytime).</p>
+        <p><strong>Birthday</strong> - Optional! We'll wish you happy birthday on your special day.</p>
+        <p><strong>Status</strong> - Let others know if you're available, away, or busy.</p>
+    </div>
+
+    <h2>Member Status Dots</h2>
+
+    <div class="event">
+        <p>🟢 <strong>Green</strong> = Available</p>
+        <p>🟡 <strong>Yellow</strong> = Away</p>
+        <p>🔴 <strong>Red</strong> = Busy</p>
+    </div>
+
+    <h2>Roles</h2>
+
+    <div class="event">
+        <p><strong>Members</strong> - Post, react, comment, and invite new people.</p>
+        <p><strong>Moderators</strong> - Can also delete posts and pin important updates.</p>
+        <p><strong>Admins</strong> - Can create events, polls, and manage the community.</p>
+    </div>
+
+    <h2>Frequently Asked Questions</h2>
+
+    <div class="event">
+        <p><strong>How do I change my profile picture?</strong></p>
+        <p class="small">Go to your profile (click your name in the nav) and pick a new avatar emoji.</p>
+    </div>
+
+    <div class="event">
+        <p><strong>How do I invite someone?</strong></p>
+        <p class="small">On the Events page, scroll down to "Invite Someone" and generate a code. Share the code or send an SMS invite directly.</p>
+    </div>
+
+    <div class="event">
+        <p><strong>What if I don't get the login text?</strong></p>
+        <p class="small">Wait a minute and try again. Make sure you're entering your phone number correctly. If it keeps failing, contact an admin.</p>
+    </div>
+
+    <div class="event">
+        <p><strong>Can others see my phone number?</strong></p>
+        <p class="small">No! Other members only see your display name and avatar. Only admins can see phone numbers.</p>
+    </div>
+
+    <div class="event">
+        <p><strong>How do I leave the community?</strong></p>
+        <p class="small">Contact an admin and they can remove your account. You can also just stop logging in - your account won't bother anyone.</p>
+    </div>
+
+    <p style="margin-top: 30px;"><a href="/">← Back to home</a></p>
+    """
+    return render_html(content, f"Help - {SITE_NAME}")
 
 
 # ============ HEALTH CHECK ============
