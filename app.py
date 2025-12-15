@@ -343,7 +343,7 @@ def seed_demo_data():
 
         # Demo members
         demo_members = [
-            ("5551234567", "Alex Demo", "alex", "🦊", 1, 0),  # Admin
+            ("5551234567", "Martin", "martin", "🦊", 1, 0),  # Admin
             ("5552345678", "Jordan Sample", "jordan", "🌻", 0, 1),  # Moderator
             ("5553456789", "Riley Test", "riley", "🎸", 0, 0),
             ("5554567890", "Casey Example", "casey", "☕", 0, 0),
