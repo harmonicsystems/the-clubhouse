@@ -801,6 +801,65 @@ def render_html(content: str, title: str = "The Clubhouse") -> HTMLResponse:
 
 # ============ ROUTES ============
 
+@app.get("/bootstrap")
+async def bootstrap():
+    """First-time setup: Create admin account if database is empty"""
+    with get_db() as db:
+        member_count = db.execute("SELECT COUNT(*) FROM members").fetchone()[0]
+        if member_count > 0:
+            return render_html("""
+                <h1>Already Set Up</h1>
+                <p>The community already has members. Bootstrap is disabled.</p>
+                <a href="/">← Go to home</a>
+            """)
+
+    content = f"""
+    <h1>Welcome to {SITE_NAME}!</h1>
+    <p>No members yet. Let's create the first admin account.</p>
+
+    <form method="POST" action="/bootstrap">
+        <input type="text" name="name" placeholder="Your first name" required>
+        <input type="tel" name="phone" placeholder="Your phone number" required>
+        <button type="submit">Create Admin Account</button>
+    </form>
+
+    <p class="small">This page only works when the database is empty.</p>
+    """
+    return render_html(content)
+
+
+@app.post("/bootstrap")
+async def bootstrap_create(name: str = Form(...), phone: str = Form(...)):
+    """Create the first admin account"""
+    phone = clean_phone(phone)
+
+    with get_db() as db:
+        member_count = db.execute("SELECT COUNT(*) FROM members").fetchone()[0]
+        if member_count > 0:
+            raise HTTPException(status_code=400, detail="Bootstrap disabled - members exist")
+
+        # Create admin account
+        db.execute(
+            "INSERT INTO members (phone, name, is_admin) VALUES (?, ?, 1)",
+            (phone, name)
+        )
+
+        # Create a few invite codes for them
+        for _ in range(3):
+            code = generate_invite()
+            db.execute(
+                "INSERT INTO invite_codes (code, created_by_phone) VALUES (?, ?)",
+                (code, phone)
+            )
+
+        db.commit()
+
+    # Log them in
+    response = RedirectResponse(url="/dashboard", status_code=303)
+    set_auth_cookie(response, phone)
+    return response
+
+
 @app.get("/")
 async def home(request: Request):
     """The front door"""
