@@ -1063,11 +1063,10 @@ def render_html(content: str, title: str = "The Clubhouse") -> HTMLResponse:
             }}
 
             function setViewMode(asMember) {{
-                if (asMember) {{
-                    fetch("/admin/view_as_member", {{ method: "POST" }}).then(() => location.reload());
-                }} else {{
-                    fetch("/admin/view_as_admin", {{ method: "POST" }}).then(() => location.reload());
-                }}
+                const url = asMember ? "/admin/view_as_member" : "/admin/view_as_admin";
+                fetch(url, {{ method: "POST", credentials: "same-origin" }})
+                    .then(() => location.reload())
+                    .catch(err => console.error("Toggle failed:", err));
             }}
 
             // Update toolbar based on current view mode
@@ -2149,17 +2148,17 @@ async def feed(request: Request, q: str = ""):
                     GROUP BY emoji
                 """, (post["id"], phone, post["id"])).fetchall()
 
-                reactions_html = '<div class="reactions">'
+                reactions_html = f'<div class="reactions" id="reactions-{post["id"]}">'
                 for reaction in reactions:
                     active_class = "active" if reaction["user_reacted"] else ""
-                    reactions_html += f'<a href="/react/{post["id"]}/{reaction["emoji"]}" class="reaction-btn {active_class}">{reaction["emoji"]} {reaction["count"]}</a>'
+                    reactions_html += f'<button onclick="toggleReaction({post["id"]}, \'{reaction["emoji"]}\')" class="reaction-btn {active_class}" data-emoji="{reaction["emoji"]}">{reaction["emoji"]} <span class="count">{reaction["count"]}</span></button>'
 
                 # Quick reaction buttons
                 quick_emojis = ["👍", "❤️", "😂", "🎉", "🔥"]
                 existing_emojis = [r["emoji"] for r in reactions]
                 for emoji in quick_emojis:
                     if emoji not in existing_emojis:
-                        reactions_html += f'<a href="/react/{post["id"]}/{emoji}" class="reaction-btn">{emoji}</a>'
+                        reactions_html += f'<button onclick="toggleReaction({post["id"]}, \'{emoji}\')" class="reaction-btn" data-emoji="{emoji}">{emoji} <span class="count"></span></button>'
 
                 reactions_html += '</div>'
 
@@ -2435,6 +2434,31 @@ async def feed(request: Request, q: str = ""):
             count.style.color = '#666';
         }}
     }}
+
+    function toggleReaction(postId, emoji) {{
+        fetch(`/react/${{postId}}/${{encodeURIComponent(emoji)}}`, {{
+            method: 'POST',
+            credentials: 'same-origin'
+        }})
+        .then(response => response.json())
+        .then(data => {{
+            if (data.success) {{
+                const container = document.getElementById(`reactions-${{postId}}`);
+                const btn = container.querySelector(`button[data-emoji="${{emoji}}"]`);
+                if (btn) {{
+                    const countSpan = btn.querySelector('.count');
+                    if (data.action === 'added') {{
+                        btn.classList.add('active');
+                        countSpan.textContent = data.count;
+                    }} else {{
+                        btn.classList.remove('active');
+                        countSpan.textContent = data.count > 0 ? data.count : '';
+                    }}
+                }}
+            }}
+        }})
+        .catch(err => console.error('Reaction failed:', err));
+    }}
     </script>
 
     {polls_html}
@@ -2469,16 +2493,16 @@ async def create_post(content: str = Form(...), csrf_token: str = Form(...), req
     return RedirectResponse(url="/feed", status_code=303)
 
 
-@app.get("/react/{post_id}/{emoji}")
+@app.post("/react/{post_id}/{emoji}")
 async def react_to_post(post_id: int, emoji: str, request: Request):
-    """Add or remove a reaction"""
+    """Add or remove a reaction (AJAX-friendly)"""
     cookie = request.cookies.get("clubhouse")
     if not cookie:
-        return RedirectResponse(url="/feed", status_code=303)
+        return {"error": "Not logged in"}
 
     phone = read_cookie(cookie)
     if not phone:
-        return RedirectResponse(url="/feed", status_code=303)
+        return {"error": "Not logged in"}
 
     with get_db() as db:
         existing = db.execute(
@@ -2491,6 +2515,7 @@ async def react_to_post(post_id: int, emoji: str, request: Request):
                 "DELETE FROM reactions WHERE post_id = ? AND phone = ? AND emoji = ?",
                 (post_id, phone, emoji)
             )
+            action = "removed"
         else:
             # Get post author
             post = db.execute("SELECT phone FROM posts WHERE id = ?", (post_id,)).fetchone()
@@ -2503,6 +2528,7 @@ async def react_to_post(post_id: int, emoji: str, request: Request):
                 "INSERT INTO reactions (post_id, phone, emoji) VALUES (?, ?, ?)",
                 (post_id, phone, emoji)
             )
+            action = "added"
 
             # Create notification for post author (only when adding reaction, not removing)
             if post:
@@ -2514,9 +2540,15 @@ async def react_to_post(post_id: int, emoji: str, request: Request):
                     post_id
                 )
 
+        # Get updated reaction count
+        count = db.execute(
+            "SELECT COUNT(*) as count FROM reactions WHERE post_id = ? AND emoji = ?",
+            (post_id, emoji)
+        ).fetchone()["count"]
+
         db.commit()
 
-    return RedirectResponse(url="/feed", status_code=303)
+    return {"success": True, "action": action, "count": count, "emoji": emoji, "post_id": post_id}
 
 
 @app.post("/vote/{poll_id}/{option_id}")
@@ -3490,8 +3522,14 @@ async def view_as_member(request: Request):
         return RedirectResponse(url="/", status_code=303)
 
     phone = read_cookie(cookie)
-    if not phone or not is_admin(phone):
+    if not phone:
         return RedirectResponse(url="/", status_code=303)
+
+    # Check admin status from database (not just ADMIN_PHONES env var)
+    with get_db() as db:
+        member = db.execute("SELECT is_admin FROM members WHERE phone = ?", (phone,)).fetchone()
+        if not member or not member["is_admin"]:
+            return RedirectResponse(url="/", status_code=303)
 
     # Set the view mode cookie and redirect to dashboard
     response = RedirectResponse(url="/dashboard", status_code=303)
@@ -3499,7 +3537,7 @@ async def view_as_member(request: Request):
         key="view_as_member",
         value="1",
         max_age=3600,  # 1 hour
-        httponly=True
+        httponly=False  # Allow JS to read for toolbar UI
     )
     return response
 
@@ -3512,8 +3550,14 @@ async def view_as_admin(request: Request):
         return RedirectResponse(url="/", status_code=303)
 
     phone = read_cookie(cookie)
-    if not phone or not is_admin(phone):
+    if not phone:
         return RedirectResponse(url="/", status_code=303)
+
+    # Check admin status from database (not just ADMIN_PHONES env var)
+    with get_db() as db:
+        member = db.execute("SELECT is_admin FROM members WHERE phone = ?", (phone,)).fetchone()
+        if not member or not member["is_admin"]:
+            return RedirectResponse(url="/", status_code=303)
 
     # Clear the view mode cookie and redirect to dashboard
     response = RedirectResponse(url="/dashboard", status_code=303)
