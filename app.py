@@ -329,8 +329,12 @@ init_database()
 # ============ HELPER FUNCTIONS ============
 
 def clean_phone(phone: str) -> str:
-    """Remove all non-numbers from phone"""
-    return ''.join(c for c in phone if c.isdigit())
+    """Remove all non-numbers and normalize to 10 digits (US)"""
+    digits = ''.join(c for c in phone if c.isdigit())
+    # If 11 digits starting with 1, strip the country code
+    if len(digits) == 11 and digits.startswith('1'):
+        digits = digits[1:]
+    return digits
 
 
 def format_phone(phone: str) -> str:
@@ -832,7 +836,7 @@ async def bootstrap():
 
     <form method="POST" action="/bootstrap">
         <input type="text" name="name" placeholder="Your first name" required>
-        <input type="tel" name="phone" placeholder="Your phone number" required>
+        <input type="tel" name="phone" placeholder="(555) 555-5555" required>
         <button type="submit">Create Admin Account</button>
     </form>
 
@@ -897,7 +901,7 @@ async def home(request: Request):
 
     <h2>Members Sign In</h2>
     <form method="POST" action="/send_code">
-        <input type="tel" name="phone" placeholder="Your phone number" required>
+        <input type="tel" name="phone" placeholder="(555) 555-5555" required>
         <button type="submit">Send me a code</button>
     </form>
 
@@ -1041,7 +1045,7 @@ async def join(invite_code: str = Form(...)):
     <form method="POST" action="/register">
         <input type="hidden" name="invite_code" value="{invite_code}">
         <input type="text" name="name" placeholder="Your first name" required>
-        <input type="tel" name="phone" placeholder="Your phone number" required>
+        <input type="tel" name="phone" placeholder="(555) 555-5555" required>
         <button type="submit">Join the clubhouse</button>
     </form>
 
