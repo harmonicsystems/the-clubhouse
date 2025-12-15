@@ -1010,6 +1010,85 @@ def render_html(content: str, title: str = "The Clubhouse") -> HTMLResponse:
         </script>
     </head>
     <body>
+        {f'''
+        <div id="demo-toolbar" style="
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 8px 15px;
+            font-size: 13px;
+            z-index: 9999;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+        ">
+            <div>
+                <strong>🧪 Demo Mode</strong>
+                <span style="opacity: 0.9; margin-left: 10px;">Viewing as: <span id="view-mode-label" style="font-weight: bold;">Admin</span></span>
+            </div>
+            <div style="display: flex; gap: 8px; align-items: center;">
+                <span style="opacity: 0.8; font-size: 12px;">Switch view:</span>
+                <button onclick="setViewMode(false)" id="btn-admin" style="
+                    padding: 4px 12px;
+                    border: 2px solid white;
+                    background: white;
+                    color: #764ba2;
+                    font-weight: bold;
+                    cursor: pointer;
+                    font-size: 12px;
+                ">👑 Admin</button>
+                <button onclick="setViewMode(true)" id="btn-member" style="
+                    padding: 4px 12px;
+                    border: 2px solid white;
+                    background: transparent;
+                    color: white;
+                    cursor: pointer;
+                    font-size: 12px;
+                ">👤 Member</button>
+            </div>
+        </div>
+        <div style="height: 50px;"></div>
+        <script>
+            function getCookie(name) {{
+                const value = "; " + document.cookie;
+                const parts = value.split("; " + name + "=");
+                if (parts.length === 2) return parts.pop().split(";").shift();
+                return null;
+            }}
+
+            function setViewMode(asMember) {{
+                if (asMember) {{
+                    fetch("/admin/view_as_member", {{ method: "POST" }}).then(() => location.reload());
+                }} else {{
+                    fetch("/admin/view_as_admin", {{ method: "POST" }}).then(() => location.reload());
+                }}
+            }}
+
+            // Update toolbar based on current view mode
+            (function() {{
+                const isViewingAsMember = getCookie("view_as_member") === "1";
+                const label = document.getElementById("view-mode-label");
+                const btnAdmin = document.getElementById("btn-admin");
+                const btnMember = document.getElementById("btn-member");
+
+                if (isViewingAsMember) {{
+                    label.textContent = "Member";
+                    btnAdmin.style.background = "transparent";
+                    btnAdmin.style.color = "white";
+                    btnMember.style.background = "white";
+                    btnMember.style.color = "#764ba2";
+                    btnMember.style.fontWeight = "bold";
+                    btnAdmin.style.fontWeight = "normal";
+                }}
+            }})();
+        </script>
+        ''' if DEV_MODE else ''}
         {content}
     </body>
     </html>
