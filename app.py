@@ -1410,15 +1410,15 @@ async def dashboard(request: Request, year: int = None, month: int = None):
         nav_html += '<a href="/logout">Sign out</a>'
         nav_html += '</div>'
 
-        invite_html = ""
-        if member["is_admin"]:
-            invite_html = """
-            <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #ccc;">
-                <form method="POST" action="/create_invite">
-                    <button type="submit">+ Generate Invite Code</button>
-                </form>
-            </div>
-            """
+        invite_html = """
+        <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #ccc;">
+            <h3>Invite Someone</h3>
+            <p class="small">Generate a one-time invite code to share with a friend.</p>
+            <form method="POST" action="/create_invite">
+                <button type="submit">+ Generate Invite Code</button>
+            </form>
+        </div>
+        """
 
     # Create heading with event count
     event_count_text = ""
