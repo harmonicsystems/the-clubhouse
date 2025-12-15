@@ -1430,10 +1430,12 @@ async def dashboard(request: Request, year: int = None, month: int = None):
         invite_html = """
         <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #ccc;">
             <h3>Invite Someone</h3>
-            <p class="small">Generate a one-time invite code to share with a friend.</p>
-            <form method="POST" action="/create_invite">
-                <button type="submit">+ Generate Invite Code</button>
+            <p class="small">Enter their phone number and we'll text them an invite.</p>
+            <form method="POST" action="/send_invite">
+                <input type="tel" name="invite_phone" placeholder="(555) 555-5555" required style="margin-bottom: 10px;">
+                <button type="submit">Send Invite Text</button>
             </form>
+            <p class="small" style="margin-top: 15px;">Or <a href="/create_invite">generate a code</a> to share yourself.</p>
         </div>
         """
 
@@ -1518,9 +1520,9 @@ async def cancel_rsvp(event_id: int, request: Request):
     return RedirectResponse(url="/dashboard", status_code=303)
 
 
-@app.post("/create_invite")
+@app.get("/create_invite")
 async def create_invite(request: Request):
-    """Generate invite code"""
+    """Generate invite code (manual sharing)"""
     cookie = request.cookies.get("clubhouse")
     if not cookie:
         return RedirectResponse(url="/dashboard", status_code=303)
@@ -1541,20 +1543,120 @@ async def create_invite(request: Request):
         )
         db.commit()
 
+    join_url = f"{SITE_URL}/join/{code}" if SITE_URL else f"/join/{code}"
+
     content = f"""
-    <h1>🎟️ Invite Code Created!</h1>
+    <h1>Invite Code Created!</h1>
 
-    <p>Share this code with someone you'd like to invite:</p>
+    <p>Share this with someone you'd like to invite:</p>
 
-    <h2 style="background: #f0f0f0; padding: 20px; text-align: center;">
-        {code}
-    </h2>
+    <div style="background: #f0f0f0; padding: 20px; margin: 20px 0;">
+        <p><strong>Code:</strong> {code}</p>
+        <p><strong>Link:</strong> <a href="/join/{code}">{join_url}</a></p>
+    </div>
 
-    <p>This code can only be used once.</p>
+    <p class="small">This code can only be used once.</p>
 
     <a href="/dashboard">← Back to dashboard</a>
     """
 
+    return render_html(content)
+
+
+@app.post("/send_invite")
+async def send_invite(request: Request, invite_phone: str = Form(...)):
+    """Generate invite code and send via SMS"""
+    cookie = request.cookies.get("clubhouse")
+    if not cookie:
+        return RedirectResponse(url="/dashboard", status_code=303)
+
+    phone = read_cookie(cookie)
+    if not phone:
+        return RedirectResponse(url="/dashboard", status_code=303)
+
+    invite_phone = clean_phone(invite_phone)
+
+    # Check if they're already a member
+    with get_db() as db:
+        existing = db.execute("SELECT * FROM members WHERE phone = ?", (invite_phone,)).fetchone()
+        if existing:
+            content = f"""
+            <h1>Already a Member</h1>
+            <p>{format_phone(invite_phone)} is already in {SITE_NAME}!</p>
+            <a href="/dashboard">← Back to dashboard</a>
+            """
+            return render_html(content)
+
+    code = generate_invite()
+
+    with get_db() as db:
+        while db.execute("SELECT * FROM invite_codes WHERE code = ?", (code,)).fetchone():
+            code = generate_invite()
+
+        db.execute(
+            "INSERT INTO invite_codes (code, created_by_phone) VALUES (?, ?)",
+            (code, phone)
+        )
+        db.commit()
+
+        # Get inviter's name
+        inviter = db.execute("SELECT name FROM members WHERE phone = ?", (phone,)).fetchone()
+        inviter_name = inviter["name"] if inviter else "Someone"
+
+    # Send the invite SMS
+    join_url = f"{SITE_URL}/join/{code}" if SITE_URL else f"the site and use code {code}"
+    message = f"{inviter_name} invited you to {SITE_NAME}! Join here: {join_url}"
+
+    if send_sms(invite_phone, message):
+        content = f"""
+        <h1>Invite Sent!</h1>
+        <p>We texted an invite to {format_phone(invite_phone)}</p>
+        <p class="small">They'll get a link to join {SITE_NAME}.</p>
+        <a href="/dashboard">← Back to dashboard</a>
+        """
+    else:
+        content = f"""
+        <h1>Couldn't Send Text</h1>
+        <p>SMS failed. You can share this code manually:</p>
+        <div style="background: #f0f0f0; padding: 20px; margin: 20px 0;">
+            <p><strong>Code:</strong> {code}</p>
+        </div>
+        <a href="/dashboard">← Back to dashboard</a>
+        """
+
+    return render_html(content)
+
+
+@app.get("/join/{code}")
+async def join_with_code(code: str):
+    """Pre-filled join page with invite code"""
+    code = code.upper().strip()
+
+    with get_db() as db:
+        invite = db.execute(
+            "SELECT * FROM invite_codes WHERE code = ? AND used_by_phone IS NULL",
+            (code,)
+        ).fetchone()
+
+        if not invite:
+            content = """
+            <h1>Invalid Code</h1>
+            <p>This invite code doesn't work or has already been used.</p>
+            <a href="/">← Back to home</a>
+            """
+            return render_html(content)
+
+    content = f"""
+    <h1>You're Invited!</h1>
+    <p>Enter your details to join {SITE_NAME}.</p>
+
+    <form method="POST" action="/register">
+        <input type="hidden" name="invite_code" value="{code}">
+        <input type="text" name="name" placeholder="Your first name" required>
+        <input type="tel" name="phone" placeholder="(555) 555-5555" required>
+        <button type="submit">Join</button>
+    </form>
+    """
     return render_html(content)
 
 
