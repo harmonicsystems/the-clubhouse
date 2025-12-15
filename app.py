@@ -51,6 +51,9 @@ DATABASE_KEY = os.getenv("DATABASE_KEY", "")
 # Production mode: enables secure cookies, hides SMS codes on screen
 PRODUCTION_MODE = os.getenv("PRODUCTION_MODE", "false").lower() == "true"
 
+# Dev mode: allows auto-login without SMS verification
+DEV_MODE = os.getenv("DEV_MODE", "false").lower() == "true" or not PRODUCTION_MODE
+
 # Warn if running in production without changing defaults
 if PRODUCTION_MODE and SECRET_SALT == "change-me-please":
     print("⚠️  WARNING: Running in production mode with default SECRET_SALT!")
@@ -328,8 +331,105 @@ def init_database():
     print(f"📚 Database ready at {DATABASE_PATH}")
 
 
+def seed_demo_data():
+    """Seed demo data for testing/demos - only runs if database is empty"""
+    with get_db() as db:
+        # Check if there are any members
+        member_count = db.execute("SELECT COUNT(*) FROM members").fetchone()[0]
+        if member_count > 0:
+            return  # Already has data, don't seed
+
+        print("🌱 Seeding demo data...")
+
+        # Demo members
+        demo_members = [
+            ("5551234567", "Alex Demo", "alex", "🦊", 1, 0),  # Admin
+            ("5552345678", "Jordan Sample", "jordan", "🌻", 0, 1),  # Moderator
+            ("5553456789", "Riley Test", "riley", "🎸", 0, 0),
+            ("5554567890", "Casey Example", "casey", "☕", 0, 0),
+            ("5555678901", "Morgan Preview", "morgan", "🎨", 0, 0),
+        ]
+
+        for phone, name, handle, avatar, is_admin, is_mod in demo_members:
+            db.execute("""
+                INSERT INTO members (phone, name, handle, display_name, avatar, is_admin, is_moderator, first_login, status)
+                VALUES (?, ?, ?, ?, ?, ?, ?, 0, 'available')
+            """, (phone, name, handle, name, avatar, is_admin, is_mod))
+
+        # Demo events (next few weeks)
+        from datetime import timedelta
+        today = datetime.now()
+
+        demo_events = [
+            ("Community Coffee Hour", "Casual hangout - bring your own mug!", today + timedelta(days=2), "09:00", "10:30", 15),
+            ("Workshop: Getting Started", "Learn how to use all the features", today + timedelta(days=5), "14:00", "15:30", 20),
+            ("Game Night", "Board games and snacks!", today + timedelta(days=8), "18:00", "21:00", 12),
+            ("Monthly Potluck", "Bring a dish to share with the community", today + timedelta(days=14), "12:00", "14:00", None),
+            ("Open Mic Night", "Share your talents - music, poetry, comedy welcome!", today + timedelta(days=21), "19:00", "22:00", 30),
+        ]
+
+        for title, desc, date, start, end, spots in demo_events:
+            db.execute("""
+                INSERT INTO events (title, description, event_date, start_time, end_time, max_spots)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (title, desc, date.strftime("%Y-%m-%d"), start, end, spots))
+
+        # Add some RSVPs
+        db.execute("INSERT INTO rsvps (event_id, phone) VALUES (1, '5551234567')")
+        db.execute("INSERT INTO rsvps (event_id, phone) VALUES (1, '5552345678')")
+        db.execute("INSERT INTO rsvps (event_id, phone) VALUES (2, '5553456789')")
+
+        # Demo posts
+        demo_posts = [
+            ("5551234567", "Welcome to the community! 🎉 Feel free to introduce yourself and say hi to everyone."),
+            ("5552345678", "Just tried the new coffee shop down the street - highly recommend the oat milk latte!"),
+            ("5553456789", "Anyone interested in starting a book club? I've been wanting to read more this year."),
+            ("5554567890", "Thanks for the warm welcome everyone! Excited to be here."),
+            ("5555678901", "PSA: The parking lot will be repaved next Tuesday. Plan accordingly!"),
+        ]
+
+        for phone, content in demo_posts:
+            db.execute("""
+                INSERT INTO posts (phone, content)
+                VALUES (?, ?)
+            """, (phone, content))
+
+        # Add some reactions
+        db.execute("INSERT INTO reactions (post_id, phone, emoji) VALUES (1, '5552345678', '❤️')")
+        db.execute("INSERT INTO reactions (post_id, phone, emoji) VALUES (1, '5553456789', '🎉')")
+        db.execute("INSERT INTO reactions (post_id, phone, emoji) VALUES (2, '5551234567', '👍')")
+        db.execute("INSERT INTO reactions (post_id, phone, emoji) VALUES (3, '5554567890', '👍')")
+        db.execute("INSERT INTO reactions (post_id, phone, emoji) VALUES (3, '5555678901', '❤️')")
+
+        # Demo poll
+        db.execute("""
+            INSERT INTO polls (question, created_by_phone)
+            VALUES ('What day works best for our next community meeting?', '5551234567')
+        """)
+        poll_id = db.execute("SELECT last_insert_rowid()").fetchone()[0]
+
+        poll_options = ["Monday evening", "Wednesday afternoon", "Saturday morning", "Sunday afternoon"]
+        for option in poll_options:
+            db.execute("INSERT INTO poll_options (poll_id, option_text) VALUES (?, ?)", (poll_id, option))
+
+        # Demo invite codes
+        demo_codes = ["DEMO-001", "DEMO-002", "DEMO-003"]
+        for code in demo_codes:
+            db.execute("""
+                INSERT INTO invite_codes (code, created_by_phone)
+                VALUES (?, '5551234567')
+            """, (code,))
+
+        db.commit()
+        print(f"✅ Demo data seeded: {len(demo_members)} members, {len(demo_events)} events, {len(demo_posts)} posts")
+
+
 # Run this when app starts
 init_database()
+
+# Seed demo data if in dev mode
+if DEV_MODE:
+    seed_demo_data()
 
 
 # ============ HELPER FUNCTIONS ============
@@ -989,6 +1089,41 @@ async def bootstrap_create(name: str = Form(...), phone: str = Form(...)):
     response = RedirectResponse(url="/welcome", status_code=303)
     set_auth_cookie(response, phone)
     return response
+
+
+@app.get("/dev")
+async def dev_login(redirect: str = "/dashboard"):
+    """Auto-login for development - only works when DEV_MODE is enabled"""
+    if not DEV_MODE:
+        raise HTTPException(status_code=404, detail="Not found")
+
+    with get_db() as db:
+        # Try to find an existing admin, or any member
+        member = db.execute(
+            "SELECT phone, name FROM members WHERE is_admin = 1 LIMIT 1"
+        ).fetchone()
+
+        if not member:
+            member = db.execute(
+                "SELECT phone, name FROM members LIMIT 1"
+            ).fetchone()
+
+        if not member:
+            # No members exist - redirect to bootstrap
+            return RedirectResponse(url="/bootstrap", status_code=303)
+
+    # Auto-login as this member
+    response = RedirectResponse(url=redirect, status_code=303)
+    set_auth_cookie(response, member["phone"])
+    return response
+
+
+@app.get("/dev/admin")
+async def dev_admin_login():
+    """Auto-login and go straight to admin panel"""
+    if not DEV_MODE:
+        raise HTTPException(status_code=404, detail="Not found")
+    return await dev_login(redirect="/admin")
 
 
 @app.get("/")
