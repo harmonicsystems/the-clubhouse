@@ -347,8 +347,13 @@ def format_phone(phone: str) -> str:
 def send_sms(phone: str, message: str) -> bool:
     """Send a text message"""
     try:
+        # Add US country code if not present (Textbelt requires it)
+        sms_phone = phone
+        if len(phone) == 10:
+            sms_phone = "1" + phone
+
         response = requests.post('https://textbelt.com/text', {
-            'phone': phone,
+            'phone': sms_phone,
             'message': message,
             'key': TEXTBELT_KEY
         }, timeout=10)
@@ -793,7 +798,59 @@ def render_html(content: str, title: str = "The Clubhouse") -> HTMLResponse:
                 color: var(--color-text-muted);
                 font-size: 14px;
             }}
+
+            /* ============ MOBILE STYLES ============ */
+            .nav {{
+                display: flex;
+                flex-wrap: wrap;
+                gap: 8px 12px;
+                align-items: center;
+            }}
+            .nav a {{
+                white-space: nowrap;
+            }}
+            @media (max-width: 600px) {{
+                body {{
+                    margin: 20px auto;
+                    padding: 15px;
+                }}
+                h1 {{
+                    font-size: 20px;
+                }}
+                .nav {{
+                    font-size: 14px;
+                    gap: 6px 10px;
+                }}
+                button {{
+                    width: 100%;
+                    padding: 12px 20px;
+                }}
+                .reaction-btn {{
+                    padding: 6px 10px;
+                }}
+            }}
+
+            /* Button loading state */
+            button:disabled {{
+                background: #999;
+                cursor: wait;
+            }}
         </style>
+        <script>
+            // Prevent double-submit on all forms
+            document.addEventListener('DOMContentLoaded', function() {{
+                document.querySelectorAll('form').forEach(function(form) {{
+                    form.addEventListener('submit', function() {{
+                        var btn = form.querySelector('button[type="submit"], button:not([type])');
+                        if (btn && !btn.disabled) {{
+                            btn.disabled = true;
+                            btn.dataset.originalText = btn.textContent;
+                            btn.textContent = 'Sending...';
+                        }}
+                    }});
+                }});
+            }});
+        </script>
     </head>
     <body>
         {content}
@@ -1604,8 +1661,11 @@ async def send_invite(request: Request, invite_phone: str = Form(...)):
         inviter_name = inviter["name"] if inviter else "Someone"
 
     # Send the invite SMS
-    join_url = f"{SITE_URL}/join/{code}" if SITE_URL else f"the site and use code {code}"
-    message = f"{inviter_name} invited you to {SITE_NAME}! Join here: {join_url}"
+    if SITE_URL:
+        join_url = f"{SITE_URL}/join/{code}"
+        message = f"{inviter_name} invited you to {SITE_NAME}!\n\nTap to join: {join_url}\n\nYou'll enter your name and phone number to sign up."
+    else:
+        message = f"{inviter_name} invited you to {SITE_NAME}!\n\nYour invite code: {code}\n\nVisit the site and enter this code with your phone number to join."
 
     if send_sms(invite_phone, message):
         content = f"""
