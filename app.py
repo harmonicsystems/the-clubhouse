@@ -1011,6 +1011,11 @@ def render_html(content: str, title: str = "The Clubhouse") -> HTMLResponse:
                 --spacing: 20px;
             }}
 
+            /* Smooth scrolling for anchor navigation */
+            html {{
+                scroll-behavior: smooth;
+            }}
+
             /* ============ BASE STYLES ============ */
             body {{
                 max-width: var(--max-width);
@@ -1058,6 +1063,12 @@ def render_html(content: str, title: str = "The Clubhouse") -> HTMLResponse:
                 border: 1px solid var(--color-border);
                 background: var(--color-bg);
                 color: var(--color-text);
+                transition: border-color 0.15s ease, box-shadow 0.15s ease;
+            }}
+            input:focus, textarea:focus, select:focus {{
+                outline: none;
+                border-color: var(--color-accent);
+                box-shadow: 0 0 0 3px rgba(26, 26, 26, 0.1);
             }}
             button {{
                 font-family: var(--font-mono);
@@ -1069,14 +1080,23 @@ def render_html(content: str, title: str = "The Clubhouse") -> HTMLResponse:
                 cursor: pointer;
                 margin-top: 10px;
                 letter-spacing: 0.01em;
+                transition: background 0.15s ease, transform 0.1s ease;
+                min-height: 44px; /* Touch-friendly tap target */
             }}
             button:hover {{
                 background: var(--color-accent-hover);
+            }}
+            button:active {{
+                transform: scale(0.98);
             }}
             .event {{
                 border: 1px solid var(--color-border);
                 padding: 15px;
                 margin: 15px 0;
+                transition: box-shadow 0.15s ease, transform 0.15s ease;
+            }}
+            .event:hover {{
+                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
             }}
             .photo-gallery {{
                 display: grid;
@@ -1097,6 +1117,18 @@ def render_html(content: str, title: str = "The Clubhouse") -> HTMLResponse:
                 border: 1px solid var(--color-border);
                 padding: 15px;
                 margin: 15px 0;
+                transition: box-shadow 0.15s ease;
+            }}
+            .post:hover {{
+                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            }}
+            /* Anchor highlight animation - shows where you landed after RSVP/vote/etc */
+            @keyframes highlight-flash {{
+                0% {{ background-color: rgba(45, 106, 79, 0.15); }}
+                100% {{ background-color: transparent; }}
+            }}
+            .event:target, .post:target {{
+                animation: highlight-flash 1.5s ease-out;
             }}
             .post-header {{
                 display: flex;
@@ -1222,16 +1254,16 @@ def render_html(content: str, title: str = "The Clubhouse") -> HTMLResponse:
                 display: inline-block;
             }}
             .icon-sm {{
-                width: 14px;
-                height: 14px;
+                width: 22px;
+                height: 22px;
             }}
             .icon-lg {{
-                width: 20px;
-                height: 20px;
+                width: 28px;
+                height: 28px;
             }}
             .icon-xl {{
-                width: 24px;
-                height: 24px;
+                width: 32px;
+                height: 32px;
             }}
             .nav .icon {{
                 margin-right: 4px;
@@ -2452,7 +2484,7 @@ async def rsvp(event_id: int, request: Request):
             message = f"You're confirmed for: {event['title']}\n {event['event_date']}"
             send_sms(phone, message)
 
-    return RedirectResponse(url="/dashboard", status_code=303)
+    return RedirectResponse(url=f"/dashboard#event-{event_id}", status_code=303)
 
 
 @app.post("/cancel_rsvp/{event_id}")
@@ -2470,7 +2502,7 @@ async def cancel_rsvp(event_id: int, request: Request):
         db.execute("DELETE FROM rsvps WHERE event_id = ? AND phone = ?", (event_id, phone))
         db.commit()
 
-    return RedirectResponse(url="/dashboard", status_code=303)
+    return RedirectResponse(url=f"/dashboard#event-{event_id}", status_code=303)
 
 
 @app.get("/create_invite")
@@ -2886,7 +2918,7 @@ async def feed(request: Request, q: str = ""):
                     '''
 
             polls_html += f'''
-            <div class="post" style="background: rgba(135, 206, 250, 0.1); border: 2px solid #1e90ff;">
+            <div class="post" id="poll-{poll["id"]}" style="background: rgba(135, 206, 250, 0.1); border: 2px solid #1e90ff;">
                 <div class="post-header">
                     <span>Poll by {html.escape(poll["creator_name"])}</span>
                     <span>{poll_time}</span>
@@ -3128,7 +3160,7 @@ async def vote_on_poll(poll_id: int, option_id: int, request: Request):
 
         db.commit()
 
-    return RedirectResponse(url="/feed", status_code=303)
+    return RedirectResponse(url=f"/feed#poll-{poll_id}", status_code=303)
 
 
 @app.post("/undo_vote/{poll_id}")
@@ -3164,7 +3196,7 @@ async def undo_vote(poll_id: int, request: Request):
 
             db.commit()
 
-    return RedirectResponse(url="/feed", status_code=303)
+    return RedirectResponse(url=f"/feed#poll-{poll_id}", status_code=303)
 
 
 @app.get("/bookmark/{post_id}")
@@ -3194,9 +3226,11 @@ async def toggle_bookmark(post_id: int, request: Request):
 
         db.commit()
 
-    # Get referrer to redirect back
+    # Get referrer to redirect back, append fragment to keep scroll position
     referer = request.headers.get("referer", "/feed")
-    return RedirectResponse(url=referer, status_code=303)
+    # Strip any existing fragment and add the post anchor
+    base_url = referer.split("#")[0]
+    return RedirectResponse(url=f"{base_url}#post-{post_id}", status_code=303)
 
 
 @app.get("/bookmarks")
@@ -3328,7 +3362,7 @@ async def reply_to_post(post_id: int, content: str = Form(...), csrf_token: str 
             post_id
         )
 
-    return RedirectResponse(url="/feed", status_code=303)
+    return RedirectResponse(url=f"/feed#post-{post_id}", status_code=303)
 
 
 @app.post("/pin_post/{post_id}")
@@ -3350,7 +3384,7 @@ async def pin_post(post_id: int, request: Request):
         db.execute("UPDATE posts SET is_pinned = 1 WHERE id = ?", (post_id,))
         db.commit()
 
-    return RedirectResponse(url="/feed", status_code=303)
+    return RedirectResponse(url=f"/feed#post-{post_id}", status_code=303)
 
 
 @app.post("/unpin_post/{post_id}")
@@ -3372,7 +3406,7 @@ async def unpin_post(post_id: int, request: Request):
         db.execute("UPDATE posts SET is_pinned = 0 WHERE id = ?", (post_id,))
         db.commit()
 
-    return RedirectResponse(url="/feed", status_code=303)
+    return RedirectResponse(url=f"/feed#post-{post_id}", status_code=303)
 
 
 @app.post("/delete_post/{post_id}")
