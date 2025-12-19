@@ -131,9 +131,9 @@ def init_database():
         except:
             pass  # Column already exists
 
-        # Add avatar emoji column
+        # Add avatar icon column (stores Lucide icon name)
         try:
-            db.execute("ALTER TABLE members ADD COLUMN avatar TEXT DEFAULT '👤'")
+            db.execute("ALTER TABLE members ADD COLUMN avatar TEXT DEFAULT 'user'")
         except:
             pass  # Column already exists
 
@@ -339,15 +339,15 @@ def seed_demo_data():
         if member_count > 0:
             return  # Already has data, don't seed
 
-        print("🌱 Seeding demo data...")
+        print("Seeding demo data...")
 
-        # Demo members
+        # Demo members (using Lucide icon names for avatars)
         demo_members = [
-            ("5551234567", "Martin", "martin", "🦊", 1, 0),  # Admin
-            ("5552345678", "Jordan Sample", "jordan", "🌻", 0, 1),  # Moderator
-            ("5553456789", "Riley Test", "riley", "🎸", 0, 0),
-            ("5554567890", "Casey Example", "casey", "☕", 0, 0),
-            ("5555678901", "Morgan Preview", "morgan", "🎨", 0, 0),
+            ("5551234567", "Martin", "martin", "squirrel", 1, 0),  # Admin
+            ("5552345678", "Jordan Sample", "jordan", "sprout", 0, 1),  # Moderator
+            ("5553456789", "Riley Test", "riley", "star", 0, 0),
+            ("5554567890", "Casey Example", "casey", "shell", 0, 0),
+            ("5555678901", "Morgan Preview", "morgan", "sailboat", 0, 0),
         ]
 
         for phone, name, handle, avatar, is_admin, is_mod in demo_members:
@@ -381,7 +381,7 @@ def seed_demo_data():
 
         # Demo posts
         demo_posts = [
-            ("5551234567", "Welcome to the community! 🎉 Feel free to introduce yourself and say hi to everyone."),
+            ("5551234567", "Welcome to the community! Feel free to introduce yourself and say hi to everyone."),
             ("5552345678", "Just tried the new coffee shop down the street - highly recommend the oat milk latte!"),
             ("5553456789", "Anyone interested in starting a book club? I've been wanting to read more this year."),
             ("5554567890", "Thanks for the warm welcome everyone! Excited to be here."),
@@ -394,12 +394,12 @@ def seed_demo_data():
                 VALUES (?, ?)
             """, (phone, content))
 
-        # Add some reactions
-        db.execute("INSERT INTO reactions (post_id, phone, emoji) VALUES (1, '5552345678', '❤️')")
-        db.execute("INSERT INTO reactions (post_id, phone, emoji) VALUES (1, '5553456789', '🎉')")
-        db.execute("INSERT INTO reactions (post_id, phone, emoji) VALUES (2, '5551234567', '👍')")
-        db.execute("INSERT INTO reactions (post_id, phone, emoji) VALUES (3, '5554567890', '👍')")
-        db.execute("INSERT INTO reactions (post_id, phone, emoji) VALUES (3, '5555678901', '❤️')")
+        # Add some reactions (using Lucide icon names)
+        db.execute("INSERT INTO reactions (post_id, phone, emoji) VALUES (1, '5552345678', 'heart')")
+        db.execute("INSERT INTO reactions (post_id, phone, emoji) VALUES (1, '5553456789', 'party-popper')")
+        db.execute("INSERT INTO reactions (post_id, phone, emoji) VALUES (2, '5551234567', 'thumbs-up')")
+        db.execute("INSERT INTO reactions (post_id, phone, emoji) VALUES (3, '5554567890', 'thumbs-up')")
+        db.execute("INSERT INTO reactions (post_id, phone, emoji) VALUES (3, '5555678901', 'heart')")
 
         # Demo poll
         db.execute("""
@@ -421,7 +421,7 @@ def seed_demo_data():
             """, (code,))
 
         db.commit()
-        print(f"✅ Demo data seeded: {len(demo_members)} members, {len(demo_events)} events, {len(demo_posts)} posts")
+        print(f"Done: Demo data seeded: {len(demo_members)} members, {len(demo_events)} events, {len(demo_posts)} posts")
 
 
 # Run this when app starts
@@ -430,6 +430,136 @@ init_database()
 # Seed demo data if in dev mode
 if DEV_MODE:
     seed_demo_data()
+
+
+# ============ PLAYGROUND (IN-MEMORY SANDBOX) ============
+
+class PlaygroundStore:
+    """In-memory data store for playground sessions - no database needed"""
+
+    def __init__(self):
+        self.sessions = {}  # session_id -> data dict
+
+    def get_session(self, session_id: str) -> dict:
+        """Get or create a session's data"""
+        if session_id not in self.sessions:
+            self.sessions[session_id] = self._create_fresh_data()
+        return self.sessions[session_id]
+
+    def reset_session(self, session_id: str):
+        """Reset a session to fresh data"""
+        self.sessions[session_id] = self._create_fresh_data()
+
+    def _create_fresh_data(self) -> dict:
+        """Create a fresh set of demo data for a new session"""
+        from datetime import timedelta
+        now = datetime.now()
+
+        # Demo members
+        members = {
+            "5550000001": {"phone": "5550000001", "name": "You", "handle": "you", "display_name": "You (Playground)", "avatar": "star", "is_admin": 1, "is_moderator": 0, "status": "available", "birthday": None, "joined_date": now.strftime("%Y-%m-%d %H:%M:%S"), "first_login": 0},
+            "5550000002": {"phone": "5550000002", "name": "Jordan", "handle": "jordan", "display_name": "Jordan", "avatar": "sprout", "is_admin": 0, "is_moderator": 1, "status": "available", "birthday": None, "joined_date": (now - timedelta(days=30)).strftime("%Y-%m-%d %H:%M:%S"), "first_login": 0},
+            "5550000003": {"phone": "5550000003", "name": "Riley", "handle": "riley", "display_name": "Riley Chen", "avatar": "shell", "is_admin": 0, "is_moderator": 0, "status": "away", "birthday": None, "joined_date": (now - timedelta(days=20)).strftime("%Y-%m-%d %H:%M:%S"), "first_login": 0},
+            "5550000004": {"phone": "5550000004", "name": "Morgan", "handle": "morgan", "display_name": "Morgan", "avatar": "sailboat", "is_admin": 0, "is_moderator": 0, "status": "busy", "birthday": None, "joined_date": (now - timedelta(days=10)).strftime("%Y-%m-%d %H:%M:%S"), "first_login": 0},
+            "5550000005": {"phone": "5550000005", "name": "Casey", "handle": "casey", "display_name": "Casey Park", "avatar": "squirrel", "is_admin": 0, "is_moderator": 0, "status": "available", "birthday": None, "joined_date": (now - timedelta(days=5)).strftime("%Y-%m-%d %H:%M:%S"), "first_login": 0},
+        }
+
+        # Demo events
+        events = {
+            1: {"id": 1, "title": "Community Coffee", "description": "Casual morning hangout. Bring your favorite mug!", "event_date": (now + timedelta(days=3)).strftime("%Y-%m-%d"), "start_time": "09:00", "end_time": "10:30", "max_spots": 12, "is_cancelled": 0},
+            2: {"id": 2, "title": "Game Night", "description": "Board games, card games, and good company.", "event_date": (now + timedelta(days=7)).strftime("%Y-%m-%d"), "start_time": "18:00", "end_time": "21:00", "max_spots": 8, "is_cancelled": 0},
+            3: {"id": 3, "title": "Book Club", "description": "Discussing this month's pick. All welcome!", "event_date": (now + timedelta(days=14)).strftime("%Y-%m-%d"), "start_time": "19:00", "end_time": "20:30", "max_spots": None, "is_cancelled": 0},
+        }
+
+        # Demo RSVPs
+        rsvps = [
+            {"event_id": 1, "phone": "5550000002"},
+            {"event_id": 1, "phone": "5550000003"},
+            {"event_id": 2, "phone": "5550000002"},
+            {"event_id": 2, "phone": "5550000004"},
+            {"event_id": 2, "phone": "5550000005"},
+        ]
+
+        # Demo posts
+        posts = {
+            1: {"id": 1, "phone": "5550000002", "content": "Welcome to the playground! Feel free to try everything - post, react, comment. Nothing here affects the real app.", "posted_date": (now - timedelta(hours=2)).strftime("%Y-%m-%d %H:%M:%S"), "is_pinned": 1},
+            2: {"id": 2, "phone": "5550000003", "content": "Just discovered the best coffee shop downtown. The oat milk latte is incredible!", "posted_date": (now - timedelta(hours=5)).strftime("%Y-%m-%d %H:%M:%S"), "is_pinned": 0},
+            3: {"id": 3, "phone": "5550000004", "content": "Anyone interested in starting a running group? Thinking Saturday mornings.", "posted_date": (now - timedelta(hours=12)).strftime("%Y-%m-%d %H:%M:%S"), "is_pinned": 0},
+            4: {"id": 4, "phone": "5550000005", "content": "Thanks for the warm welcome everyone! Excited to be part of this community.", "posted_date": (now - timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S"), "is_pinned": 0},
+        }
+
+        # Demo reactions
+        reactions = [
+            {"post_id": 1, "phone": "5550000003", "emoji": "heart"},
+            {"post_id": 1, "phone": "5550000004", "emoji": "thumbs-up"},
+            {"post_id": 2, "phone": "5550000002", "emoji": "flame"},
+            {"post_id": 2, "phone": "5550000005", "emoji": "thumbs-up"},
+            {"post_id": 3, "phone": "5550000002", "emoji": "thumbs-up"},
+            {"post_id": 4, "phone": "5550000002", "emoji": "heart"},
+            {"post_id": 4, "phone": "5550000003", "emoji": "party-popper"},
+        ]
+
+        # Demo comments
+        comments = {
+            1: {"id": 1, "post_id": 1, "phone": "5550000003", "content": "This is so cool!", "posted_date": (now - timedelta(hours=1)).strftime("%Y-%m-%d %H:%M:%S")},
+            2: {"id": 2, "post_id": 2, "phone": "5550000004", "content": "Which shop? I need good coffee recommendations!", "posted_date": (now - timedelta(hours=4)).strftime("%Y-%m-%d %H:%M:%S")},
+            3: {"id": 3, "post_id": 3, "phone": "5550000005", "content": "Count me in! What pace are you thinking?", "posted_date": (now - timedelta(hours=10)).strftime("%Y-%m-%d %H:%M:%S")},
+        }
+
+        # Demo poll
+        polls = {
+            1: {"id": 1, "question": "What should we do for the next community event?", "created_by_phone": "5550000002", "is_active": 1, "created_date": (now - timedelta(days=2)).strftime("%Y-%m-%d %H:%M:%S")},
+        }
+
+        poll_options = {
+            1: {"id": 1, "poll_id": 1, "option_text": "Outdoor movie night", "vote_count": 3},
+            2: {"id": 2, "poll_id": 1, "option_text": "Potluck dinner", "vote_count": 2},
+            3: {"id": 3, "poll_id": 1, "option_text": "Trivia night", "vote_count": 1},
+            4: {"id": 4, "poll_id": 1, "option_text": "Volunteer day", "vote_count": 0},
+        }
+
+        poll_votes = [
+            {"poll_id": 1, "phone": "5550000003", "option_id": 1},
+            {"poll_id": 1, "phone": "5550000004", "option_id": 1},
+            {"poll_id": 1, "phone": "5550000005", "option_id": 2},
+        ]
+
+        # Counters for new IDs
+        counters = {
+            "post_id": 5,
+            "comment_id": 4,
+            "event_id": 4,
+            "poll_id": 2,
+            "poll_option_id": 5,
+        }
+
+        return {
+            "members": members,
+            "events": events,
+            "rsvps": rsvps,
+            "posts": posts,
+            "reactions": reactions,
+            "comments": comments,
+            "polls": polls,
+            "poll_options": poll_options,
+            "poll_votes": poll_votes,
+            "bookmarks": [],
+            "notifications": [],
+            "counters": counters,
+            "current_user": "5550000001",  # The playground user
+        }
+
+# Global playground store
+playground = PlaygroundStore()
+
+def get_playground_session_id(request) -> str:
+    """Get or create playground session ID from cookie"""
+    return request.cookies.get("playground_session", "")
+
+def generate_playground_session() -> str:
+    """Generate a new playground session ID"""
+    import secrets
+    return secrets.token_hex(16)
 
 
 # ============ HELPER FUNCTIONS ============
@@ -487,7 +617,7 @@ def send_sms(phone: str, message: str) -> bool:
         }, timeout=10)
         return response.json().get('success', False)
     except:
-        print(f"📱 Failed to send SMS to {phone}")
+        print(f"Failed to send SMS to {phone}")
         return False
 
 
@@ -510,6 +640,56 @@ def generate_invite() -> str:
     """Generate a friendly invite code like MOON-742"""
     words = ['MOON', 'STAR', 'TREE', 'BIRD', 'FISH', 'BEAR', 'WOLF', 'FROG', 'LAKE', 'RAIN']
     return f"{random.choice(words)}-{random.randint(100, 999)}"
+
+
+def icon(name: str, size: str = "", extra_class: str = "") -> str:
+    """Generate a Lucide icon element.
+
+    Usage: icon('home'), icon('bell', 'lg'), icon('user', '', 'my-class')
+    Sizes: sm, lg, xl (default is 16px)
+    """
+    size_class = f"icon-{size}" if size else ""
+    classes = f"icon {size_class} {extra_class}".strip()
+    return f'<i data-lucide="{name}" class="{classes}"></i>'
+
+
+# Available avatar icons (Lucide icon names)
+AVATAR_ICONS = [
+    "user", "sprout", "star", "shell", "sailboat", "squirrel",
+    "skull", "smile", "square-terminal", "scale", "sword", "sun"
+]
+DEFAULT_AVATAR = "user"
+
+# Reaction icons (Lucide icon names)
+REACTION_ICONS = ["thumbs-up", "heart", "laugh", "party-popper", "flame"]
+
+
+def avatar_icon(icon_name: str = None, size: str = "") -> str:
+    """Generate an avatar using a Lucide icon.
+
+    Usage: avatar_icon('sprout'), avatar_icon('star', 'sm')
+    """
+    icon_name = icon_name if icon_name in AVATAR_ICONS else DEFAULT_AVATAR
+    size_class = f"avatar-{size}" if size else ""
+    classes = f"avatar {size_class}".strip()
+    return f'<span class="{classes}"><i data-lucide="{icon_name}" class="icon"></i></span>'
+
+
+def avatar(name: str, size: str = "") -> str:
+    """Generate an avatar with initials from a name (fallback).
+
+    Usage: avatar('John Doe'), avatar('Jane', 'sm')
+    """
+    # Get initials (up to 2 characters)
+    parts = name.split()
+    if len(parts) >= 2:
+        initials = (parts[0][0] + parts[-1][0]).upper()
+    else:
+        initials = name[:2].upper() if len(name) >= 2 else name.upper()
+
+    size_class = f"avatar-{size}" if size else ""
+    classes = f"avatar {size_class}".strip()
+    return f'<span class="{classes}">{html.escape(initials)}</span>'
 
 
 def check_rate_limit(phone: str, max_attempts: int = 10, window_hours: int = 1) -> bool:
@@ -681,7 +861,7 @@ def sanitize_content(content: str) -> str:
             embed_html = f'''
             <div style="margin: 15px 0; border: 1px solid #000; background: #f9f9f9; padding: 10px;">
                 <img src="{url}" style="max-width: 100%; height: auto; display: block;" alt="Image">
-                <p class="small" style="margin: 5px 0 0 0;">🖼️ Image</p>
+                <p class="small" style="margin: 5px 0 0 0;"><i data-lucide="image" class="icon icon-sm"></i> Image</p>
             </div>
             '''
             embedded_urls.append(url)
@@ -779,20 +959,53 @@ def render_html(content: str, title: str = "The Clubhouse") -> HTMLResponse:
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <title>{title}</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&display=swap" rel="stylesheet">
         <style>
-            /* ============ THEME VARIABLES ============ */
-            /* Change these to customize the look! */
+            /* ============ STYLE GUIDE ============ */
+            /*
+             * THE CLUBHOUSE DESIGN SYSTEM
+             *
+             * TYPOGRAPHY:
+             * --font-body: Source Serif 4 (serif)
+             *   → Human content: posts, comments, descriptions, body text
+             *   → Warm, readable, inviting
+             *
+             * --font-mono: IBM Plex Mono (monospace)
+             *   → System/data: timestamps, counts, codes, metadata
+             *   → Technical, precise, structured
+             *
+             * HIERARCHY (via weight + density):
+             * - Page titles: 600 weight, generous bottom margin
+             * - Section heads: 500 weight, tight to content
+             * - Body: 400 weight, relaxed line-height (1.6)
+             * - Metadata: smaller size, muted color, tighter spacing
+             *
+             * SPACING RHYTHM:
+             * - Cards: 15px padding, 15px margin between
+             * - Sections: 30px top margin
+             * - Tight metadata: 5px gaps
+             * - Generous content: 10-15px gaps
+             *
+             * COLORS:
+             * - Primary text: #1a1a1a (not pure black - softer)
+             * - Muted text: #666 (timestamps, hints)
+             * - Borders: #e0e0e0 light, #1a1a1a strong
+             * - Accent: #1a1a1a (buttons, links)
+             */
             :root {{
                 --color-bg: #fff;
-                --color-text: #000;
+                --color-text: #1a1a1a;
                 --color-text-muted: #666;
-                --color-border: #000;
-                --color-border-light: #ddd;
-                --color-accent: #000;
+                --color-border: #1a1a1a;
+                --color-border-light: #e0e0e0;
+                --color-accent: #1a1a1a;
                 --color-accent-hover: #333;
-                --color-success: #28a745;
-                --color-highlight: #f0f0f0;
-                --font-main: 'Courier New', monospace;
+                --color-success: #2d6a4f;
+                --color-highlight: #f8f8f8;
+                --font-body: 'Source Serif 4', Georgia, serif;
+                --font-mono: 'IBM Plex Mono', monospace;
                 --font-size: 16px;
                 --max-width: 600px;
                 --spacing: 20px;
@@ -803,21 +1016,37 @@ def render_html(content: str, title: str = "The Clubhouse") -> HTMLResponse:
                 max-width: var(--max-width);
                 margin: 50px auto;
                 padding: var(--spacing);
-                font-family: var(--font-main);
+                font-family: var(--font-body);
                 font-size: var(--font-size);
                 line-height: 1.6;
                 color: var(--color-text);
                 background: var(--color-bg);
             }}
             h1 {{
-                font-size: 24px;
+                font-family: var(--font-body);
+                font-size: 26px;
+                font-weight: 600;
                 margin-bottom: 30px;
                 border-bottom: 2px solid var(--color-border);
                 padding-bottom: 10px;
+                letter-spacing: -0.02em;
             }}
             h2 {{
+                font-family: var(--font-body);
                 font-size: 18px;
+                font-weight: 500;
                 margin-top: 30px;
+                margin-bottom: 10px;
+            }}
+            h3 {{
+                font-family: var(--font-body);
+                font-size: 16px;
+                font-weight: 500;
+                margin: 0 0 8px 0;
+            }}
+            /* Monospace for data/system elements */
+            .mono, .small, time, .timestamp, .count, code {{
+                font-family: var(--font-mono);
             }}
             input, textarea, select {{
                 font-family: inherit;
@@ -831,14 +1060,15 @@ def render_html(content: str, title: str = "The Clubhouse") -> HTMLResponse:
                 color: var(--color-text);
             }}
             button {{
-                font-family: inherit;
-                font-size: inherit;
+                font-family: var(--font-mono);
+                font-size: 14px;
                 padding: 10px 20px;
                 background: var(--color-accent);
                 color: var(--color-bg);
                 border: none;
                 cursor: pointer;
                 margin-top: 10px;
+                letter-spacing: 0.01em;
             }}
             button:hover {{
                 background: var(--color-accent-hover);
@@ -871,12 +1101,15 @@ def render_html(content: str, title: str = "The Clubhouse") -> HTMLResponse:
             .post-header {{
                 display: flex;
                 justify-content: space-between;
-                font-size: 14px;
+                font-family: var(--font-mono);
+                font-size: 13px;
                 color: var(--color-text-muted);
-                margin-bottom: 10px;
+                margin-bottom: 12px;
+                letter-spacing: 0.01em;
             }}
             .post-content {{
-                margin: 10px 0;
+                margin: 12px 0;
+                line-height: 1.65;
             }}
             .reactions {{
                 margin-top: 10px;
@@ -884,31 +1117,68 @@ def render_html(content: str, title: str = "The Clubhouse") -> HTMLResponse:
                 border-top: 1px solid var(--color-border-light);
             }}
             .reaction-btn {{
-                display: inline-block;
-                padding: 4px 8px;
+                display: inline-flex;
+                align-items: center;
+                gap: 4px;
+                padding: 4px 10px;
                 margin: 2px;
-                border: 1px solid var(--color-border-light);
+                border: 1px solid transparent;
+                background: transparent;
                 text-decoration: none;
-                border-radius: 4px;
-            }}
-            .reaction-btn:hover {{
-                background: var(--color-highlight);
-            }}
-            .reaction-btn.active {{
-                background: var(--color-highlight);
-                border-color: var(--color-border);
-            }}
-            .small {{
-                font-size: 12px;
+                border-radius: 20px;
+                cursor: pointer;
+                transition: all 0.15s ease;
                 color: var(--color-text-muted);
             }}
+            .reaction-btn .icon {{
+                opacity: 0.6;
+                transition: all 0.15s ease;
+            }}
+            .reaction-btn:hover {{
+                transform: scale(1.05);
+            }}
+            .reaction-btn:hover .icon {{
+                opacity: 1;
+            }}
+            .reaction-btn:active {{
+                transform: scale(0.95);
+            }}
+            /* Muted color fills for each reaction type */
+            .reaction-btn[data-emoji="thumbs-up"] {{ color: #5b8fb9; }}
+            .reaction-btn[data-emoji="thumbs-up"]:hover,
+            .reaction-btn[data-emoji="thumbs-up"].active {{ background: rgba(91, 143, 185, 0.12); border-color: rgba(91, 143, 185, 0.3); }}
+            .reaction-btn[data-emoji="heart"] {{ color: #c77d8e; }}
+            .reaction-btn[data-emoji="heart"]:hover,
+            .reaction-btn[data-emoji="heart"].active {{ background: rgba(199, 125, 142, 0.12); border-color: rgba(199, 125, 142, 0.3); }}
+            .reaction-btn[data-emoji="laugh"] {{ color: #c9a857; }}
+            .reaction-btn[data-emoji="laugh"]:hover,
+            .reaction-btn[data-emoji="laugh"].active {{ background: rgba(201, 168, 87, 0.12); border-color: rgba(201, 168, 87, 0.3); }}
+            .reaction-btn[data-emoji="party-popper"] {{ color: #9b7bb8; }}
+            .reaction-btn[data-emoji="party-popper"]:hover,
+            .reaction-btn[data-emoji="party-popper"].active {{ background: rgba(155, 123, 184, 0.12); border-color: rgba(155, 123, 184, 0.3); }}
+            .reaction-btn[data-emoji="flame"] {{ color: #d4845a; }}
+            .reaction-btn[data-emoji="flame"]:hover,
+            .reaction-btn[data-emoji="flame"].active {{ background: rgba(212, 132, 90, 0.12); border-color: rgba(212, 132, 90, 0.3); }}
+            .reaction-btn.active {{
+                font-weight: 500;
+            }}
+            .reaction-btn.active .icon {{
+                opacity: 1;
+            }}
+            .small {{
+                font-family: var(--font-mono);
+                font-size: 12px;
+                color: var(--color-text-muted);
+                letter-spacing: 0.01em;
+            }}
             .hint {{
-                background: #fffde7;
-                border-left: 3px solid #ffc107;
+                font-family: var(--font-mono);
+                background: #fafaf8;
+                border-left: 3px solid var(--color-border-light);
                 padding: 10px 15px;
                 margin: 15px 0;
-                font-size: 13px;
-                color: #666;
+                font-size: 12px;
+                color: var(--color-text-muted);
             }}
             .error {{
                 color: #c00;
@@ -922,9 +1192,17 @@ def render_html(content: str, title: str = "The Clubhouse") -> HTMLResponse:
                 color: var(--color-text);
             }}
             .nav {{
+                font-family: var(--font-mono);
+                font-size: 13px;
                 margin-bottom: 30px;
                 padding-bottom: 10px;
                 border-bottom: 1px solid var(--color-border);
+            }}
+            .nav a {{
+                text-decoration: none;
+            }}
+            .nav a:hover {{
+                text-decoration: underline;
             }}
             details {{
                 margin-top: 10px;
@@ -933,6 +1211,55 @@ def render_html(content: str, title: str = "The Clubhouse") -> HTMLResponse:
                 cursor: pointer;
                 color: var(--color-text-muted);
                 font-size: 14px;
+            }}
+
+            /* ============ ICONS ============ */
+            .icon {{
+                width: 16px;
+                height: 16px;
+                stroke-width: 2;
+                vertical-align: middle;
+                display: inline-block;
+            }}
+            .icon-sm {{
+                width: 14px;
+                height: 14px;
+            }}
+            .icon-lg {{
+                width: 20px;
+                height: 20px;
+            }}
+            .icon-xl {{
+                width: 24px;
+                height: 24px;
+            }}
+            .nav .icon {{
+                margin-right: 4px;
+            }}
+            /* Status indicators */
+            .status-available {{ color: #6b9080; }}  /* muted sage green */
+            .status-away {{ color: #9a8c7d; }}       /* warm taupe */
+            .status-busy {{ color: #a07178; }}       /* muted rose */
+            /* Avatar circle with initials */
+            .avatar {{
+                width: 32px;
+                height: 32px;
+                border-radius: 50%;
+                background: var(--color-border);
+                color: var(--color-bg);
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 12px;
+                font-weight: bold;
+                margin-right: 8px;
+                flex-shrink: 0;
+            }}
+            .avatar-sm {{
+                width: 24px;
+                height: 24px;
+                font-size: 10px;
+                margin-right: 6px;
             }}
 
             /* ============ MOBILE STYLES ============ */
@@ -1008,6 +1335,8 @@ def render_html(content: str, title: str = "The Clubhouse") -> HTMLResponse:
                 }});
             }});
         </script>
+        <!-- Lucide Icons -->
+        <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
     </head>
     <body>
         {f'''
@@ -1077,6 +1406,7 @@ def render_html(content: str, title: str = "The Clubhouse") -> HTMLResponse:
         </script>
         ''' if DEV_MODE else ''}
         {content}
+        <script>lucide.createIcons();</script>
     </body>
     </html>
     """
@@ -1192,6 +1522,229 @@ async def dev_admin_login():
     return await dev_login(redirect="/admin")
 
 
+@app.get("/dev/reset")
+async def dev_reset():
+    """Reset database and reseed demo data - only in dev mode"""
+    if not DEV_MODE:
+        raise HTTPException(status_code=404, detail="Not found")
+
+    with get_db() as db:
+        # Clear all data
+        tables = ["poll_votes", "poll_options", "polls", "bookmarks", "notifications",
+                  "comments", "reactions", "event_photos", "posts", "rsvps", "events",
+                  "invite_codes", "members"]
+        for table in tables:
+            try:
+                db.execute(f"DELETE FROM {table}")
+            except:
+                pass  # Table might not exist
+        db.commit()
+
+    # Re-seed demo data
+    seed_demo_data()
+
+    content = """
+    <h1>Database Reset</h1>
+    <p class="success">Demo data has been reseeded!</p>
+    <p><a href="/dev">→ Login as demo admin</a></p>
+    <p><a href="/demo">→ View public demo</a></p>
+    """
+    return render_html(content)
+
+
+@app.get("/demo")
+async def public_demo():
+    """Public read-only demo of the community feed - only in dev mode"""
+    if not DEV_MODE:
+        raise HTTPException(status_code=404, detail="Not found")
+
+    with get_db() as db:
+        # Get recent posts
+        posts = db.execute("""
+            SELECT p.*, m.name, m.display_name, m.avatar
+            FROM posts p
+            JOIN members m ON p.phone = m.phone
+            ORDER BY p.is_pinned DESC, p.posted_date DESC
+            LIMIT 20
+        """).fetchall()
+
+        posts_html = ""
+        if posts:
+            for post in posts:
+                relative_time = format_relative_time(post["posted_date"])
+                post_content = sanitize_content(post['content'])
+
+                # Get reactions (read-only display)
+                reactions = db.execute("""
+                    SELECT emoji, COUNT(*) as count
+                    FROM reactions
+                    WHERE post_id = ?
+                    GROUP BY emoji
+                """, (post["id"],)).fetchall()
+
+                reactions_html = '<div class="reactions">'
+                for reaction in reactions:
+                    reactions_html += f'<span class="reaction-btn">{reaction["emoji"]} <span class="count">{reaction["count"]}</span></span>'
+                reactions_html += '</div>'
+
+                # Get comment count
+                comment_count = db.execute(
+                    "SELECT COUNT(*) FROM comments WHERE post_id = ?",
+                    (post["id"],)
+                ).fetchone()[0]
+
+                comments_html = ""
+                if comment_count > 0:
+                    comments_html = f'<p class="small" style="margin-top: 10px;">Comments: {comment_count} comment{"s" if comment_count != 1 else ""}</p>'
+
+                pinned_badge = ""
+                if post["is_pinned"]:
+                    pinned_badge = '<span style="background: #28a745; color: white; padding: 2px 6px; font-size: 11px; border-radius: 3px; margin-right: 8px;">PINNED</span>'
+
+                post_name = post["display_name"] or post["name"]
+                post_avatar = avatar_icon(post["avatar"], "sm")
+
+                posts_html += f"""
+                <div class="post" style="{'border: 2px solid #28a745;' if post['is_pinned'] else ''}">
+                    <div class="post-header">
+                        <span>{post_avatar}{pinned_badge}{html.escape(post_name)}</span>
+                        <span>{relative_time}</span>
+                    </div>
+                    <div class="post-content">{post_content}</div>
+                    {reactions_html}
+                    {comments_html}
+                </div>
+                """
+        else:
+            posts_html = """
+            <div style="text-align: center; padding: 40px 20px; color: #666;">
+                <p style="font-size: 18px;">No posts yet</p>
+                <p>The community feed is waiting for its first post!</p>
+            </div>
+            """
+
+        # Get active polls (read-only results)
+        polls = db.execute("""
+            SELECT p.*, m.name as creator_name
+            FROM polls p
+            JOIN members m ON p.created_by_phone = m.phone
+            WHERE p.is_active = 1
+            ORDER BY p.created_date DESC
+            LIMIT 3
+        """).fetchall()
+
+        polls_html = ""
+        for poll in polls:
+            options = db.execute("""
+                SELECT option_text, vote_count
+                FROM poll_options
+                WHERE poll_id = ?
+                ORDER BY vote_count DESC
+            """, (poll["id"],)).fetchall()
+
+            total_votes = sum(opt["vote_count"] for opt in options)
+            poll_time = format_relative_time(poll["created_date"])
+
+            options_html = ""
+            for opt in options:
+                percentage = (opt["vote_count"] / total_votes * 100) if total_votes > 0 else 0
+                bar_width = int(percentage)
+                options_html += f'''
+                <div style="margin: 8px 0; padding: 8px; background: #fff; border: 1px solid #ddd; border-radius: 4px;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                        <span>{html.escape(opt["option_text"])}</span>
+                        <span style="font-weight: bold;">{percentage:.0f}%</span>
+                    </div>
+                    <div style="background: #eee; height: 8px; border-radius: 4px; overflow: hidden;">
+                        <div style="background: #666; height: 100%; width: {bar_width}%;"></div>
+                    </div>
+                </div>
+                '''
+
+            polls_html += f'''
+            <div class="post" style="background: rgba(135, 206, 250, 0.1); border: 2px solid #1e90ff;">
+                <div class="post-header">
+                    <span>Poll by {html.escape(poll["creator_name"])}</span>
+                    <span>{poll_time}</span>
+                </div>
+                <h3 style="margin: 10px 0;">{html.escape(poll["question"])}</h3>
+                {options_html}
+                <p class="small" style="margin-top: 10px;">Total votes: {total_votes}</p>
+            </div>
+            '''
+
+        # Get upcoming events
+        events = db.execute("""
+            SELECT e.*, COUNT(r.phone) as rsvp_count
+            FROM events e
+            LEFT JOIN rsvps r ON e.id = r.event_id
+            WHERE e.event_date >= date('now') AND e.is_cancelled = 0
+            GROUP BY e.id
+            ORDER BY e.event_date ASC
+            LIMIT 3
+        """).fetchall()
+
+        events_html = ""
+        if events:
+            events_html = "<h2>Upcoming Events</h2>"
+            for event in events:
+                spots_text = ""
+                if event["max_spots"]:
+                    spots_left = event["max_spots"] - event["rsvp_count"]
+                    spots_text = f" · {spots_left} spots left"
+                else:
+                    spots_text = f" · {event['rsvp_count']} attending"
+
+                events_html += f"""
+                <div class="event">
+                    <strong>{html.escape(event['title'])}</strong>
+                    <p class="small">{event['event_date']} {event['start_time'] or ''}{spots_text}</p>
+                </div>
+                """
+
+        # Get member count
+        member_count = db.execute("SELECT COUNT(*) FROM members").fetchone()[0]
+
+        # Get unused demo invite codes
+        demo_codes = db.execute("""
+            SELECT code FROM invite_codes
+            WHERE code LIKE 'DEMO-%' AND used_by_phone IS NULL
+            LIMIT 3
+        """).fetchall()
+
+        invite_codes_html = ""
+        if demo_codes:
+            codes = ", ".join([f"<code>{c['code']}</code>" for c in demo_codes])
+            invite_codes_html = f"<p>Try these invite codes: {codes}</p>"
+
+    content = f"""
+    <div style="background: #f0f7ff; border: 2px solid #1e90ff; padding: 20px; margin-bottom: 30px; border-radius: 8px;">
+        <h2 style="margin: 0 0 10px 0;">Welcome to the Demo!</h2>
+        <p style="margin: 0 0 15px 0;">This is a preview of The Clubhouse community. {member_count} members are already here.</p>
+        {invite_codes_html}
+        <p style="margin: 0;">
+            <a href="/" style="background: #000; color: #fff; padding: 10px 20px; text-decoration: none; display: inline-block;">Join the Community →</a>
+            <a href="/dev" style="margin-left: 10px;">or quick login as demo user</a>
+        </p>
+    </div>
+
+    {events_html}
+
+    <h2>Community Feed</h2>
+    <p class="small">A preview of recent community posts and discussions.</p>
+
+    {polls_html}
+    {posts_html}
+
+    <div style="text-align: center; padding: 30px; background: #f9f9f9; margin-top: 30px;">
+        <p>Want to join the conversation?</p>
+        <a href="/" style="background: #000; color: #fff; padding: 12px 24px; text-decoration: none; display: inline-block;">Get Started →</a>
+    </div>
+    """
+
+    return render_html(content, title=f"Demo - {SITE_NAME}")
+
+
 @app.get("/")
 async def home(request: Request):
     """The front door"""
@@ -1227,6 +1780,7 @@ async def home(request: Request):
     </form>
 
     <p class="small">This is a private community. Invite codes only.</p>
+    {'<p style="margin-top: 20px;"><a href="/demo">👀 Preview the community →</a></p>' if DEV_MODE else ''}
 
     <hr style="margin-top: 40px; border: none; border-top: 1px solid var(--color-border-light);">
     <p class="small"><a href="/help">Help</a> · <a href="/contact">Contact</a> · <a href="/privacy">Privacy</a></p>
@@ -1241,7 +1795,7 @@ async def send_code(phone: str = Form(...)):
 
     if not check_rate_limit(phone):
         content = """
-        <h1>⏰ Slow down!</h1>
+        <h1>Slow down</h1>
         <p class="error">Too many attempts. Try again in an hour.</p>
         <a href="/">← Back</a>
         """
@@ -1251,7 +1805,7 @@ async def send_code(phone: str = Form(...)):
         member = db.execute("SELECT * FROM members WHERE phone = ?", (phone,)).fetchone()
         if not member:
             content = """
-            <h1>🤔 Not Found</h1>
+            <h1>Not Found</h1>
             <p>This phone number isn't registered.</p>
             <p>You need an invite code to join.</p>
             <a href="/">← Back</a>
@@ -1269,7 +1823,7 @@ async def send_code(phone: str = Form(...)):
     if PRODUCTION_MODE:
         # Production: Don't show code on screen, user must check their phone
         content = f"""
-        <h1>📱 Code Sent!</h1>
+        <h1>Code Sent</h1>
         <p>We sent a 6-digit code to {format_phone(phone)}</p>
 
         <form method="POST" action="/verify">
@@ -1283,10 +1837,10 @@ async def send_code(phone: str = Form(...)):
         """
     else:
         # Development: Show code on screen for easy testing
-        print(f"\n📱 SMS CODE FOR {format_phone(phone)}: {code}\n")
+        print(f"\nSMS CODE FOR {format_phone(phone)}: {code}\n")
 
         content = f"""
-        <h1>📱 Code Generated!</h1>
+        <h1>Code Generated</h1>
         <p>Your login code for {format_phone(phone)} is:</p>
         <h2 style="background: #f0f0f0; padding: 20px; text-align: center; font-size: 32px;">
             {code}
@@ -1298,7 +1852,7 @@ async def send_code(phone: str = Form(...)):
             <button type="submit">Verify</button>
         </form>
 
-        <p class="small">🔧 Dev mode: Code shown on screen. Set PRODUCTION_MODE=true to hide.</p>
+        <p class="small"><i data-lucide="wrench" class="icon icon-sm"></i> Dev mode: Code shown on screen. Set PRODUCTION_MODE=true to hide.</p>
         <a href="/">← Back</a>
         """
 
@@ -1318,7 +1872,7 @@ async def verify(phone: str = Form(...), code: str = Form(...)):
         return response
     else:
         content = """
-        <h1>❌ Wrong Code</h1>
+        <h1>Wrong Code</h1>
         <p>That code isn't right. Try again?</p>
         <a href="/">← Back</a>
         """
@@ -1338,7 +1892,7 @@ async def join(invite_code: str = Form(...)):
 
         if not invite:
             content = """
-            <h1>🚫 Invalid Code</h1>
+            <h1>Invalid Code</h1>
             <p>That invite code doesn't work.</p>
             <a href="/">← Back</a>
             """
@@ -1347,14 +1901,14 @@ async def join(invite_code: str = Form(...)):
         member_count = db.execute("SELECT COUNT(*) as count FROM members").fetchone()["count"]
         if member_count >= MAX_MEMBERS:
             content = f"""
-            <h1>🏠 We're Full!</h1>
+            <h1>We're Full</h1>
             <p>The clubhouse has reached {MAX_MEMBERS} members.</p>
             <a href="/">← Back</a>
             """
             return render_html(content)
 
     content = f"""
-    <h1>🎉 Welcome!</h1>
+    <h1>Welcome!</h1>
     <p>Your invite code <strong>{invite_code}</strong> is valid!</p>
 
     <form method="POST" action="/register">
@@ -1387,7 +1941,7 @@ async def register(invite_code: str = Form(...), name: str = Form(...), phone: s
         existing = db.execute("SELECT * FROM members WHERE phone = ?", (phone,)).fetchone()
         if existing:
             content = """
-            <h1>📱 Already Registered</h1>
+            <h1>Already Registered</h1>
             <p>This phone number is already in the clubhouse.</p>
             <a href="/">← Sign in instead</a>
             """
@@ -1439,27 +1993,27 @@ async def welcome_tour(request: Request):
         db.commit()
 
     content = f"""
-    <h1>Welcome to {SITE_NAME}! 🎉</h1>
+    <h1>Welcome to {SITE_NAME}!</h1>
 
     <p style="font-size: 18px;">Hey {html.escape(member["name"])}, you're in! Here's what you can do:</p>
 
     <div class="event" style="margin: 20px 0;">
-        <h3>📅 Events</h3>
+        <h3>Events</h3>
         <p>See what's happening and RSVP to community gatherings. This is your main dashboard.</p>
     </div>
 
     <div class="event" style="margin: 20px 0;">
-        <h3>📝 Feed</h3>
+        <h3>Feed</h3>
         <p>Share updates, thoughts, and questions with the community. React with emoji and comment on posts.</p>
     </div>
 
     <div class="event" style="margin: 20px 0;">
-        <h3>👥 Members</h3>
+        <h3><i data-lucide="users" class="icon"></i> Members</h3>
         <p>See who's in the community. Set your status to let others know if you're available to chat.</p>
     </div>
 
     <div class="event" style="margin: 20px 0;">
-        <h3>🔔 Notifications</h3>
+        <h3>Notifications</h3>
         <p>Get notified when someone reacts to or comments on your posts.</p>
     </div>
 
@@ -1686,7 +2240,7 @@ async def dashboard(request: Request, year: int = None, month: int = None):
         calendar_html += """
             </tbody>
         </table>
-        <p class="hint">💡 <strong>Tip:</strong> Click an event on the calendar to jump to it below. Green = you're going. Yellow = today.</p>
+        <p class="hint"><i data-lucide="lightbulb" class="icon icon-sm"></i> <strong>Tip:</strong> Click an event on the calendar to jump to it below. Green = you're going. Yellow = today.</p>
         """
 
         # Get upcoming events list
@@ -1803,32 +2357,32 @@ async def dashboard(request: Request, year: int = None, month: int = None):
         unread_count = get_unread_count(phone)
         notif_badge = f' <span style="background: #e74c3c; color: #fff; padding: 2px 6px; font-size: 11px; border-radius: 10px;">{unread_count}</span>' if unread_count > 0 else ''
 
-        user_avatar = member["avatar"] or "👤"
         user_display_name = member["display_name"] or member["name"]
+        user_avatar = avatar_icon(member["avatar"], "sm")
 
         # Check if admin is viewing as member
         viewing_as_member = member["is_admin"] and request.cookies.get("view_as_member") == "1"
 
         nav_html = '<div class="nav">'
-        nav_html += f'<a href="/profile"><span style="font-size: 16px; margin-right: 4px;">{user_avatar}</span><strong>{html.escape(user_display_name)}</strong></a> | '
-        nav_html += '<a href="/dashboard">Events</a> | '
-        nav_html += '<a href="/feed">Feed</a> | '
-        nav_html += '<a href="/members">Members</a> | '
-        nav_html += f'<a href="/notifications">🔔<span class="mobile-hide"> Notifications</span>{notif_badge}</a> | '
-        nav_html += '<a href="/bookmarks">🔖<span class="mobile-hide"> Bookmarks</span></a> | '
+        nav_html += f'<a href="/profile">{user_avatar}<strong>{html.escape(user_display_name)}</strong></a> | '
+        nav_html += f'<a href="/dashboard">{icon("calendar-days")}<span class="mobile-hide"> Events</span></a> | '
+        nav_html += f'<a href="/feed">{icon("message-square")}<span class="mobile-hide"> Feed</span></a> | '
+        nav_html += f'<a href="/members">{icon("book-heart")}<span class="mobile-hide"> Members</span></a> | '
+        nav_html += f'<a href="/notifications">{icon("bell")}<span class="mobile-hide"> Notifications</span>{notif_badge}</a> | '
+        nav_html += f'<a href="/bookmarks">{icon("book-marked")}<span class="mobile-hide"> Bookmarks</span></a> | '
         if member["is_admin"] and not viewing_as_member:
-            nav_html += '<a href="/admin">Admin</a> | '
-        nav_html += '<a href="/logout">Sign out</a> | '
-        nav_html += '<a href="/help">?</a>'
+            nav_html += f'<a href="/admin">{icon("terminal")}<span class="mobile-hide"> Admin</span></a> | '
+        nav_html += f'<a href="/logout">{icon("log-out")}<span class="mobile-hide"> Sign out</span></a> | '
+        nav_html += f'<a href="/help">{icon("help-circle")}</a>'
         nav_html += '</div>'
 
         invite_html = """
         <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #ccc;">
-            <h3>👋 Know someone who'd fit in?</h3>
+            <h3>Know someone who'd fit in?</h3>
             <p>Send them an invite to join the community!</p>
             <form method="POST" action="/send_invite" style="margin: 15px 0;">
                 <input type="tel" name="invite_phone" placeholder="Their phone number" required style="margin-bottom: 10px;">
-                <button type="submit">📱 Send Invite via Text</button>
+                <button type="submit">Send Invite via Text</button>
             </form>
             <details style="margin-top: 15px;">
                 <summary style="cursor: pointer; color: #666;">Or share a code manually →</summary>
@@ -1945,7 +2499,7 @@ async def create_invite(request: Request):
     join_url = f"{SITE_URL}/join/{code}" if SITE_URL else f"/join/{code}"
 
     content = f"""
-    <h1>🎉 Invite Code Created!</h1>
+    <h1>Invite Code Created</h1>
 
     <p>Share these instructions with your friend:</p>
 
@@ -1963,7 +2517,7 @@ async def create_invite(request: Request):
         <p class="small" style="margin: 10px 0 0 0;">They can enter this at the homepage.</p>
     </div>
 
-    <p class="small">⚠️ This code can only be used once and expires after use.</p>
+    <p class="small"><i data-lucide="alert-triangle" class="icon icon-sm"></i> This code can only be used once and expires after use.</p>
 
     <a href="/dashboard">← Back to dashboard</a>
     """
@@ -2087,6 +2641,9 @@ async def feed(request: Request, q: str = ""):
         if not member:
             return RedirectResponse(url="/", status_code=303)
 
+        # Check if admin is viewing as member
+        viewing_as_member = member["is_admin"] and request.cookies.get("view_as_member") == "1"
+
         # Get all posts (pinned first, then by date), with optional search
         if q:
             # Search posts by content
@@ -2126,14 +2683,19 @@ async def feed(request: Request, q: str = ""):
                 reactions_html = f'<div class="reactions" id="reactions-{post["id"]}">'
                 for reaction in reactions:
                     active_class = "active" if reaction["user_reacted"] else ""
-                    reactions_html += f'<button onclick="toggleReaction({post["id"]}, \'{reaction["emoji"]}\')" class="reaction-btn {active_class}" data-emoji="{reaction["emoji"]}">{reaction["emoji"]} <span class="count">{reaction["count"]}</span></button>'
+                    # Render as icon if it's a known icon name, otherwise show as text
+                    reaction_name = reaction["emoji"]
+                    if reaction_name in REACTION_ICONS:
+                        reaction_display = f'<i data-lucide="{reaction_name}" class="icon icon-sm"></i>'
+                    else:
+                        reaction_display = reaction_name
+                    reactions_html += f'<button onclick="toggleReaction({post["id"]}, \'{reaction_name}\')" class="reaction-btn {active_class}" data-emoji="{reaction_name}">{reaction_display} <span class="count">{reaction["count"]}</span></button>'
 
-                # Quick reaction buttons
-                quick_emojis = ["👍", "❤️", "😂", "🎉", "🔥"]
-                existing_emojis = [r["emoji"] for r in reactions]
-                for emoji in quick_emojis:
-                    if emoji not in existing_emojis:
-                        reactions_html += f'<button onclick="toggleReaction({post["id"]}, \'{emoji}\')" class="reaction-btn" data-emoji="{emoji}">{emoji} <span class="count"></span></button>'
+                # Quick reaction buttons (using Lucide icons)
+                existing_reactions = [r["emoji"] for r in reactions]
+                for reaction_icon in REACTION_ICONS:
+                    if reaction_icon not in existing_reactions:
+                        reactions_html += f'<button onclick="toggleReaction({post["id"]}, \'{reaction_icon}\')" class="reaction-btn" data-emoji="{reaction_icon}"><i data-lucide="{reaction_icon}" class="icon icon-sm"></i> <span class="count"></span></button>'
 
                 reactions_html += '</div>'
 
@@ -2158,17 +2720,17 @@ async def feed(request: Request, q: str = ""):
                         if is_moderator_or_admin(member) and not viewing_as_member:
                             comment_delete = f'''
                             <form method="POST" action="/delete_comment/{comment['id']}" style="display: inline; margin-left: 5px;">
-                                <button type="submit" onclick="return confirm('Delete?')" style="background: #d00; color: white; padding: 2px 6px; font-size: 11px;">🗑️</button>
+                                <button type="submit" onclick="return confirm('Delete?')" style="background: #d00; color: white; padding: 2px 6px; font-size: 11px;" title="Delete"><i data-lucide="trash" class="icon icon-sm"></i></button>
                             </form>
                             '''
 
-                        comment_avatar = comment["avatar"] or "👤"
                         comment_name = comment["display_name"] or comment["name"]
+                        comment_avatar = avatar_icon(comment["avatar"], "sm")
 
                         comments_html += f'''
                         <div style="margin: 8px 0; padding: 8px; background: rgba(0,0,0,0.02);">
                             <div style="font-size: 12px; color: #666; margin-bottom: 4px;">
-                                <span style="font-size: 16px; margin-right: 4px;">{comment_avatar}</span><strong>{html.escape(comment_name)}</strong> · {comment_time}{comment_delete}
+                                {comment_avatar}<strong>{html.escape(comment_name)}</strong> · {comment_time}{comment_delete}
                             </div>
                             <div style="font-size: 14px;">{comment_content}</div>
                         </div>
@@ -2179,7 +2741,7 @@ async def feed(request: Request, q: str = ""):
                 csrf_token = get_csrf_token(phone)
                 reply_form = f'''
                 <details style="margin-top: 10px;">
-                    <summary>💬 Reply ({len(comments)})</summary>
+                    <summary>Reply ({len(comments)})</summary>
                     <form method="POST" action="/reply/{post['id']}" style="margin-top: 8px;">
                         <input type="hidden" name="csrf_token" value="{csrf_token}">
                         <textarea name="content" placeholder="Write a reply..." rows="2" required maxlength="300" style="width: 100%; font-family: inherit; font-size: 14px; padding: 8px;"></textarea>
@@ -2195,26 +2757,26 @@ async def feed(request: Request, q: str = ""):
                     if post["is_pinned"]:
                         pin_button = f'''
                         <form method="POST" action="/unpin_post/{post['id']}" style="display: inline; margin-left: 5px;">
-                            <button type="submit" style="background: #666; color: white; padding: 4px 8px; font-size: 12px;">📌 Unpin</button>
+                            <button type="submit" style="background: #666; color: white; padding: 4px 8px; font-size: 12px;" title="Unpin"><i data-lucide="pin-off" class="icon icon-sm"></i></button>
                         </form>
                         '''
                     else:
                         pin_button = f'''
                         <form method="POST" action="/pin_post/{post['id']}" style="display: inline; margin-left: 5px;">
-                            <button type="submit" style="background: #333; color: white; padding: 4px 8px; font-size: 12px;">📌 Pin</button>
+                            <button type="submit" style="background: #333; color: white; padding: 4px 8px; font-size: 12px;" title="Pin"><i data-lucide="pin" class="icon icon-sm"></i></button>
                         </form>
                         '''
 
                     delete_button = f'''
                     <form method="POST" action="/delete_post/{post['id']}" style="display: inline; margin-left: 5px;">
-                        <button type="submit" onclick="return confirm('Delete post?')" style="background: #d00; color: white; padding: 4px 8px; font-size: 12px;">🗑️</button>
+                        <button type="submit" onclick="return confirm('Delete post?')" style="background: #d00; color: white; padding: 4px 8px; font-size: 12px;" title="Delete"><i data-lucide="trash" class="icon icon-sm"></i></button>
                     </form>
                     '''
                     mod_controls = pin_button + delete_button
 
                 pinned_badge = ""
                 if post["is_pinned"]:
-                    pinned_badge = '<span style="background: #28a745; color: white; padding: 2px 6px; font-size: 11px; border-radius: 3px; margin-right: 8px;">📌 PINNED</span>'
+                    pinned_badge = '<span style="background: #28a745; color: white; padding: 2px 6px; font-size: 11px; border-radius: 3px; margin-right: 8px;">PINNED</span>'
 
                 # Check if bookmarked
                 is_bookmarked = db.execute(
@@ -2222,16 +2784,17 @@ async def feed(request: Request, q: str = ""):
                     (phone, post["id"])
                 ).fetchone()
 
-                bookmark_link = f'<a href="/bookmark/{post["id"]}" style="margin-left: 10px;">{"🔖" if is_bookmarked else "🔗"} {"Saved" if is_bookmarked else "Save"}</a>'
+                bookmark_icon = icon("bookmark-check") if is_bookmarked else icon("bookmark")
+                bookmark_link = f'<a href="/bookmark/{post["id"]}" style="margin-left: 10px;">{bookmark_icon} {"Saved" if is_bookmarked else "Save"}</a>'
 
                 # Get display name and avatar
-                post_avatar = post["avatar"] or "👤"
                 post_name = post["display_name"] or post["name"]
+                post_avatar = avatar_icon(post["avatar"], "sm")
 
                 posts_html += f"""
                 <div class="post" id="post-{post['id']}" style="{'border: 2px solid #28a745;' if post['is_pinned'] else ''}">
                     <div class="post-header">
-                        <span><span style="font-size: 20px; margin-right: 6px;">{post_avatar}</span>{pinned_badge}{html.escape(post_name)}</span>
+                        <span>{post_avatar}{pinned_badge}{html.escape(post_name)}</span>
                         <span>{relative_time}{bookmark_link}{mod_controls}</span>
                     </div>
                     <div class="post-content">{post_content}</div>
@@ -2325,7 +2888,7 @@ async def feed(request: Request, q: str = ""):
             polls_html += f'''
             <div class="post" style="background: rgba(135, 206, 250, 0.1); border: 2px solid #1e90ff;">
                 <div class="post-header">
-                    <span>📊 Poll by {html.escape(poll["creator_name"])}</span>
+                    <span>Poll by {html.escape(poll["creator_name"])}</span>
                     <span>{poll_time}</span>
                 </div>
                 <h3 style="margin: 10px 0;">{html.escape(poll["question"])}</h3>
@@ -2337,19 +2900,16 @@ async def feed(request: Request, q: str = ""):
         unread_count = get_unread_count(phone)
         notif_badge = f' <span style="background: #e74c3c; color: #fff; padding: 2px 6px; font-size: 11px; border-radius: 10px;">{unread_count}</span>' if unread_count > 0 else ''
 
-        user_avatar = member["avatar"] or "👤"
         user_display_name = member["display_name"] or member["name"]
-
-        # Check if admin is viewing as member
-        viewing_as_member = member["is_admin"] and request.cookies.get("view_as_member") == "1"
+        user_avatar = avatar_icon(member["avatar"], "sm")
 
         nav_html = '<div class="nav">'
-        nav_html += f'<a href="/profile"><span style="font-size: 16px; margin-right: 4px;">{user_avatar}</span><strong>{html.escape(user_display_name)}</strong></a> | '
-        nav_html += '<a href="/dashboard">Events</a> | '
-        nav_html += '<a href="/feed">Feed</a> | '
-        nav_html += '<a href="/members">Members</a> | '
-        nav_html += f'<a href="/notifications">🔔<span class="mobile-hide"> Notifications</span>{notif_badge}</a> | '
-        nav_html += '<a href="/bookmarks">🔖<span class="mobile-hide"> Bookmarks</span></a> | '
+        nav_html += f'<a href="/profile"><strong>{html.escape(user_display_name)}</strong></a> | '
+        nav_html += f'<a href="/dashboard">{icon("calendar-days")}<span class="mobile-hide"> Events</span></a> | '
+        nav_html += f'<a href="/feed">{icon("message-square")}<span class="mobile-hide"> Feed</span></a> | '
+        nav_html += f'<a href="/members">{icon("book-heart")}<span class="mobile-hide"> Members</span></a> | '
+        nav_html += f'<a href="/notifications">{icon("bell")}<span class="mobile-hide"> Notifications</span>{notif_badge}</a> | '
+        nav_html += '<a href="/bookmarks">{icon("book-marked")}<span class="mobile-hide"> Bookmarks</span></a> | '
         if member["is_admin"] and not viewing_as_member:
             nav_html += '<a href="/admin">Admin</a> | '
         nav_html += '<a href="/logout">Sign out</a> | '
@@ -2371,7 +2931,7 @@ async def feed(request: Request, q: str = ""):
     content = f"""
     {nav_html}
 
-    <h1>📝 Community Feed</h1>
+    <h1>Community Feed</h1>
 
     {search_form}
 
@@ -2671,14 +3231,14 @@ async def bookmarks_page(request: Request):
             for post in posts:
                 relative_time = format_relative_time(post["posted_date"])
                 post_content = sanitize_content(post['content'])
-                post_avatar = post["avatar"] or "👤"
                 post_name = post["display_name"] or post["name"]
+                post_avatar = avatar_icon(post["avatar"], "sm")
 
                 posts_html += f"""
                 <div class="post" id="post-{post['id']}">
                     <div class="post-header">
-                        <span><span style="font-size: 20px; margin-right: 6px;">{post_avatar}</span>{html.escape(post_name)}</span>
-                        <span>{relative_time} · <a href="/bookmark/{post['id']}">🔖 Remove</a></span>
+                        <span>{post_avatar}{html.escape(post_name)}</span>
+                        <span>{relative_time} · <a href="/bookmark/{post['id']}">{icon("bookmark-minus")} Remove</a></span>
                     </div>
                     <div class="post-content">{post_content}</div>
                     <p class="small"><a href="/feed#post-{post['id']}">View on feed →</a></p>
@@ -2688,7 +3248,7 @@ async def bookmarks_page(request: Request):
             posts_html = """
             <div style="text-align: center; padding: 30px 20px; color: #666; border: 1px dashed #ccc;">
                 <p style="font-size: 18px;">No bookmarks yet</p>
-                <p>Bookmark posts from the feed by clicking 🔖 to save them here.</p>
+                <p>Bookmark posts from the feed by clicking the bookmark icon to save them here.</p>
                 <p><a href="/feed">Go to the Feed →</a></p>
             </div>
             """
@@ -2697,16 +3257,16 @@ async def bookmarks_page(request: Request):
         unread_count = get_unread_count(phone)
         notif_badge = f' <span style="background: #e74c3c; color: #fff; padding: 2px 6px; font-size: 11px; border-radius: 10px;">{unread_count}</span>' if unread_count > 0 else ''
 
-        user_avatar = member["avatar"] or "👤"
         user_display_name = member["display_name"] or member["name"]
+        user_avatar = avatar_icon(member["avatar"], "sm")
 
         nav_html = '<div class="nav">'
-        nav_html += f'<a href="/profile"><span style="font-size: 16px; margin-right: 4px;">{user_avatar}</span><strong>{html.escape(user_display_name)}</strong></a> | '
-        nav_html += '<a href="/dashboard">Events</a> | '
-        nav_html += '<a href="/feed">Feed</a> | '
-        nav_html += '<a href="/members">Members</a> | '
-        nav_html += f'<a href="/notifications">🔔<span class="mobile-hide"> Notifications</span>{notif_badge}</a> | '
-        nav_html += '<a href="/bookmarks">🔖<span class="mobile-hide"> Bookmarks</span></a> | '
+        nav_html += f'<a href="/profile"><strong>{html.escape(user_display_name)}</strong></a> | '
+        nav_html += f'<a href="/dashboard">{icon("calendar-days")}<span class="mobile-hide"> Events</span></a> | '
+        nav_html += f'<a href="/feed">{icon("message-square")}<span class="mobile-hide"> Feed</span></a> | '
+        nav_html += f'<a href="/members">{icon("book-heart")}<span class="mobile-hide"> Members</span></a> | '
+        nav_html += f'<a href="/notifications">{icon("bell")}<span class="mobile-hide"> Notifications</span>{notif_badge}</a> | '
+        nav_html += '<a href="/bookmarks">{icon("book-marked")}<span class="mobile-hide"> Bookmarks</span></a> | '
         if member["is_admin"]:
             nav_html += '<a href="/admin">Admin</a> | '
         nav_html += '<a href="/logout">Sign out</a> | '
@@ -2716,7 +3276,7 @@ async def bookmarks_page(request: Request):
     content = f"""
     {nav_html}
 
-    <h1>🔖 Your Bookmarks</h1>
+    <h1>Your Bookmarks</h1>
     <p class="small">Posts you've saved for later</p>
 
     {posts_html}
@@ -2897,7 +3457,7 @@ async def notifications_page(request: Request):
     if notifications:
         for n in notifications:
             actor_name = n["display_name"] or n["name"] or "Someone"
-            actor_avatar = n["avatar"] or "👤"
+            actor_avatar = n["avatar"] if n["avatar"] in AVATAR_ICONS else DEFAULT_AVATAR
             time_ago = n["created_date"][:16]  # Simple date/time display
             read_class = "" if n["is_read"] else 'style="background: #f0f8ff;"'
 
@@ -2910,7 +3470,7 @@ async def notifications_page(request: Request):
 
             notifs_html += f"""
             <div class="event" {read_class}>
-                <p><span style="font-size: 20px; margin-right: 6px;">{actor_avatar}</span><strong>{html.escape(n["message"])}</strong>{link}</p>
+                <p>{avatar_icon(actor_avatar, "sm")}<strong>{html.escape(n["message"])}</strong>{link}</p>
                 <p class="small">{time_ago}</p>
             </div>
             """
@@ -2927,17 +3487,17 @@ async def notifications_page(request: Request):
     unread_count = 0  # Just marked all as read
     notif_badge = ''
 
-    user_avatar = member["avatar"] or "👤"
     user_display_name = member["display_name"] or member["name"]
+    user_avatar = avatar_icon(member["avatar"], "sm")
 
     nav_html = '<div class="nav">'
-    nav_html += f'<a href="/profile"><span style="font-size: 16px; margin-right: 4px;">{user_avatar}</span><strong>{html.escape(user_display_name)}</strong></a> | '
-    nav_html += '<a href="/dashboard">Events</a> | '
-    nav_html += '<a href="/feed">Feed</a> | '
-    nav_html += '<a href="/members">Members</a> | '
-    nav_html += f'<a href="/notifications">🔔<span class="mobile-hide"> Notifications</span>{notif_badge}</a> | '
+    nav_html += f'<a href="/profile">{user_avatar}<strong>{html.escape(user_display_name)}</strong></a> | '
+    nav_html += f'<a href="/dashboard">{icon("calendar-days")}<span class="mobile-hide"> Events</span></a> | '
+    nav_html += f'<a href="/feed">{icon("message-square")}<span class="mobile-hide"> Feed</span></a> | '
+    nav_html += f'<a href="/members">{icon("book-heart")}<span class="mobile-hide"> Members</span></a> | '
+    nav_html += f'<a href="/notifications">{icon("bell")}<span class="mobile-hide"> Notifications</span>{notif_badge}</a> | '
     if member["is_admin"]:
-        nav_html += '<a href="/admin">Admin</a> | '
+        nav_html += f'<a href="/admin">{icon("terminal")}<span class="mobile-hide"> Admin</span></a> | '
     nav_html += '<a href="/logout">Sign out</a> | '
     nav_html += '<a href="/help">?</a>'
     nav_html += '</div>'
@@ -2945,7 +3505,7 @@ async def notifications_page(request: Request):
     content = f"""
     {nav_html}
 
-    <h1>🔔 Notifications</h1>
+    <h1>Notifications</h1>
 
     {notifs_html}
     """
@@ -2971,16 +3531,15 @@ async def profile_page(request: Request):
 
     display_name = member["display_name"] or member["name"]
     handle = member["handle"] or "Not set"
-    avatar = member["avatar"] or "👤"
+    current_avatar = member["avatar"] if member["avatar"] in AVATAR_ICONS else DEFAULT_AVATAR
     birthday = member["birthday"] or ""
 
-    # Popular emoji choices
-    emoji_options = ["👤", "😀", "😎", "🤓", "😇", "🤠", "👻", "💀", "🤖", "👽", "🦄", "🐱", "🐶", "🐼", "🦊", "🦁", "🐯", "🐻", "🐨", "🐸", "🦉", "⭐", "💎", "🎨", "🎭", "🎸", "🪕", "🎹"]
-
-    emoji_picker = '<div style="display: grid; grid-template-columns: repeat(10, 1fr); gap: 5px; max-width: 400px;">'
-    for emoji in emoji_options:
-        emoji_picker += f'<button type="button" onclick="document.getElementById(\'avatar-input\').value=\'{emoji}\'; document.getElementById(\'current-avatar\').textContent=\'{emoji}\'" style="font-size: 24px; padding: 8px; cursor: pointer;">{emoji}</button>'
-    emoji_picker += '</div>'
+    # Icon picker
+    icon_picker = '<div style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; max-width: 360px;">'
+    for icon_name in AVATAR_ICONS:
+        selected = 'style="background: var(--color-border); color: var(--color-bg);"' if icon_name == current_avatar else ''
+        icon_picker += f'''<button type="button" onclick="selectAvatar('{icon_name}')" class="avatar-option" id="avatar-{icon_name}" {selected} style="padding: 12px; cursor: pointer; border: 1px solid var(--color-border); background: var(--color-bg);"><i data-lucide="{icon_name}" class="icon icon-lg"></i></button>'''
+    icon_picker += '</div>'
 
     # Get unread notification count
     unread_count = get_unread_count(phone)
@@ -2988,10 +3547,10 @@ async def profile_page(request: Request):
 
     nav_html = '<div class="nav">'
     nav_html += f'<a href="/profile"><strong>{member["name"]}</strong></a> | '
-    nav_html += '<a href="/dashboard">Events</a> | '
-    nav_html += '<a href="/feed">Feed</a> | '
-    nav_html += '<a href="/members">Members</a> | '
-    nav_html += f'<a href="/notifications">🔔<span class="mobile-hide"> Notifications</span>{notif_badge}</a> | '
+    nav_html += f'<a href="/dashboard">{icon("calendar-days")}<span class="mobile-hide"> Events</span></a> | '
+    nav_html += f'<a href="/feed">{icon("message-square")}<span class="mobile-hide"> Feed</span></a> | '
+    nav_html += f'<a href="/members">{icon("book-heart")}<span class="mobile-hide"> Members</span></a> | '
+    nav_html += f'<a href="/notifications">{icon("bell")}<span class="mobile-hide"> Notifications</span>{notif_badge}</a> | '
     if member["is_admin"]:
         nav_html += '<a href="/admin">Admin</a> | '
     nav_html += '<a href="/logout">Sign out</a> | '
@@ -3008,7 +3567,7 @@ async def profile_page(request: Request):
 
     <div class="event">
         <h3>Your Info</h3>
-        <p><strong>Avatar:</strong> <span style="font-size: 48px;">{avatar}</span></p>
+        <p><strong>Avatar:</strong> {avatar_icon(current_avatar, "")}</p>
         <p><strong>Handle:</strong> @{html.escape(handle)}</p>
         <p><strong>Display Name:</strong> {html.escape(display_name)}</p>
         <p><strong>Phone:</strong> {format_phone(phone)}</p>
@@ -3016,19 +3575,31 @@ async def profile_page(request: Request):
     </div>
 
     <div class="event">
-        <h3>📸 Pick Your Avatar</h3>
-        <p>Choose an emoji to represent you!</p>
+        <h3>Pick Your Avatar</h3>
+        <p>Choose an icon to represent you.</p>
         <form method="POST" action="/update_profile">
-            <p>Current: <span id="current-avatar" style="font-size: 48px;">{avatar}</span></p>
-            {emoji_picker}
-            <input type="hidden" id="avatar-input" name="avatar" value="{avatar}">
-            <button type="submit" style="margin-top: 10px;">Save Avatar</button>
+            <p>Current: <span id="current-avatar">{avatar_icon(current_avatar, "")}</span></p>
+            {icon_picker}
+            <input type="hidden" id="avatar-input" name="avatar" value="{current_avatar}">
+            <button type="submit" style="margin-top: 15px;">Save Avatar</button>
         </form>
-        <p class="hint" style="margin-top: 15px;">💡 Your avatar appears next to your posts and comments in the feed.</p>
+        <p class="small" style="margin-top: 15px;">Your avatar appears next to your posts and comments.</p>
+        <script>
+        function selectAvatar(iconName) {{
+            document.getElementById('avatar-input').value = iconName;
+            document.querySelectorAll('.avatar-option').forEach(btn => {{
+                btn.style.background = 'var(--color-bg)';
+                btn.style.color = 'var(--color-text)';
+            }});
+            document.getElementById('avatar-' + iconName).style.background = 'var(--color-border)';
+            document.getElementById('avatar-' + iconName).style.color = 'var(--color-bg)';
+            lucide.createIcons();
+        }}
+        </script>
     </div>
 
     <div class="event">
-        <h3>✏️ Edit Display Name</h3>
+        <h3>Edit Display Name</h3>
         <p>This is the name others see. You can change it anytime!</p>
         <form method="POST" action="/update_display_name">
             <input type="text" name="display_name" value="{html.escape(display_name)}" placeholder="Display name" required maxlength="50">
@@ -3037,7 +3608,7 @@ async def profile_page(request: Request):
     </div>
 
     <div class="event">
-        <h3>🎂 Birthday (Optional)</h3>
+        <h3>Birthday (Optional)</h3>
         <p>We'll wish you happy birthday and show a badge on your special day!</p>
         <form method="POST" action="/update_birthday">
             <input type="date" name="birthday" value="{birthday}">
@@ -3045,7 +3616,7 @@ async def profile_page(request: Request):
         </form>
     </div>
 
-    <p class="small">💡 Only admins can change handles. Contact an admin if you need your handle changed.</p>
+    <p class="small">Only admins can change handles. Contact an admin if you need your handle changed.</p>
     """
 
     return render_html(content)
@@ -3144,18 +3715,19 @@ async def members_directory(request: Request):
         elif m["is_moderator"]:
             badge = '<span style="background: #666; color: #fff; padding: 2px 6px; font-size: 11px; margin-left: 8px;">MOD</span>'
 
-        # Status indicator
+        # Status indicator (using distinct icons)
         status = m["status"] or "available"
-        status_emoji = {
-            "available": "🟢",
-            "away": "🟡",
-            "busy": "🔴"
-        }.get(status, "🟢")
+        status_icons = {
+            "available": '<span class="status-available" title="Available"><i data-lucide="circle-dot" class="icon icon-sm"></i></span>',
+            "away": '<span class="status-away" title="Away"><i data-lucide="moon" class="icon icon-sm"></i></span>',
+            "busy": '<span class="status-busy" title="Busy"><i data-lucide="headphones" class="icon icon-sm"></i></span>'
+        }
+        status_icon = status_icons.get(status, status_icons["available"])
         status_text = status.capitalize()
 
         # Member card
         join_date = datetime.strptime(m["joined_date"], "%Y-%m-%d %H:%M:%S").strftime("%B %d, %Y")
-        member_avatar = m["avatar"] or "👤"
+        member_avatar = m["avatar"] if m["avatar"] in AVATAR_ICONS else DEFAULT_AVATAR
         member_name = m["display_name"] or m["name"]
 
         # Check if it's their birthday today
@@ -3166,28 +3738,28 @@ async def members_directory(request: Request):
                 bday_month_day = m["birthday"][5:]  # Get MM-DD
                 today_month_day = datetime.now().strftime("%m-%d")
                 if bday_month_day == today_month_day:
-                    birthday_badge = '<span style="font-size: 20px; margin-left: 8px;">🎂</span>'
+                    birthday_badge = f'<span style="margin-left: 8px;"><i data-lucide="cake" class="icon"></i></span>'
             except:
                 pass
 
         members_list += f"""
         <div class="event" style="padding: 12px;">
-            <h3 style="margin: 0;"><span style="font-size: 24px; margin-right: 8px;">{member_avatar}</span>{status_emoji} {html.escape(member_name)}{badge}{birthday_badge}</h3>
+            <h3 style="margin: 0;">{avatar_icon(member_avatar)} {status_icon} {html.escape(member_name)}{badge}{birthday_badge}</h3>
             <p class="small" style="margin: 5px 0 0 0;">{status_text} • Joined {join_date}</p>
         </div>
         """
 
-    user_avatar = member["avatar"] or "👤"
     user_display_name = member["display_name"] or member["name"]
+    user_avatar = avatar_icon(member["avatar"], "sm")
 
     nav_html = '<div class="nav">'
-    nav_html += f'<a href="/profile"><span style="font-size: 16px; margin-right: 4px;">{user_avatar}</span><strong>{html.escape(user_display_name)}</strong></a> | '
-    nav_html += '<a href="/dashboard">Events</a> | '
-    nav_html += '<a href="/feed">Feed</a> | '
-    nav_html += '<a href="/members">Members</a> | '
-    nav_html += '<a href="/bookmarks">🔖<span class="mobile-hide"> Bookmarks</span></a> | '
+    nav_html += f'<a href="/profile">{user_avatar}<strong>{html.escape(user_display_name)}</strong></a> | '
+    nav_html += f'<a href="/dashboard">{icon("calendar-days")}<span class="mobile-hide"> Events</span></a> | '
+    nav_html += f'<a href="/feed">{icon("message-square")}<span class="mobile-hide"> Feed</span></a> | '
+    nav_html += f'<a href="/members">{icon("book-heart")}<span class="mobile-hide"> Members</span></a> | '
+    nav_html += f'<a href="/bookmarks">{icon("book-marked")}<span class="mobile-hide"> Bookmarks</span></a> | '
     if member["is_admin"]:
-        nav_html += '<a href="/admin">Admin</a> | '
+        nav_html += f'<a href="/admin">{icon("terminal")}<span class="mobile-hide"> Admin</span></a> | '
     nav_html += '<a href="/logout">Sign out</a> | '
     nav_html += '<a href="/help">?</a>'
     nav_html += '</div>'
@@ -3198,20 +3770,20 @@ async def members_directory(request: Request):
     content = f"""
     {nav_html}
 
-    <h1>👥 Members ({len(members)})</h1>
+    <h1>Members ({len(members)})</h1>
 
     <div class="event" style="background: #f9f9f9; margin-bottom: 20px;">
         <form method="POST" action="/update_status" style="display: flex; gap: 10px; align-items: center;">
             <select name="status" style="width: auto;">
-                <option value="available" {"selected" if current_status == "available" else ""}>🟢 Available</option>
-                <option value="away" {"selected" if current_status == "away" else ""}>🟡 Away</option>
-                <option value="busy" {"selected" if current_status == "busy" else ""}>🔴 Busy</option>
+                <option value="available" {"selected" if current_status == "available" else ""}>Available</option>
+                <option value="away" {"selected" if current_status == "away" else ""}>Away</option>
+                <option value="busy" {"selected" if current_status == "busy" else ""}>Busy</option>
             </select>
             <button type="submit">Update Status</button>
         </form>
     </div>
 
-    <p class="hint">💡 Status dots show availability: 🟢 = available for chat, 🟡 = away, 🔴 = busy. Set yours above!</p>
+    <p class="hint"><i data-lucide="lightbulb" class="icon icon-sm"></i> Status icons: <span class="status-available"><i data-lucide="circle-dot" class="icon icon-sm"></i></span> available, <span class="status-away"><i data-lucide="moon" class="icon icon-sm"></i></span> away, <span class="status-busy"><i data-lucide="headphones" class="icon icon-sm"></i></span> busy</p>
 
     {members_list}
     """
@@ -3310,7 +3882,7 @@ async def admin_panel(request: Request):
     content = f"""
     {nav_html}
 
-    <h1>🔧 Admin Panel</h1>
+    <h1>Admin Panel</h1>
 
     <div class="event">
         <h3>Stats</h3>
@@ -3347,7 +3919,7 @@ async def admin_panel(request: Request):
     </div>
 
     <div style="margin-top: 30px; padding: 20px; background: #f0f8ff; border-left: 4px solid #007bff;">
-        <h3 style="margin-top: 0;">👁️ View as Member</h3>
+        <h3 style="margin-top: 0;"><i data-lucide="eye" class="icon"></i> View as Member</h3>
         <p class="small">See what the site looks like for regular members (hides admin controls).</p>
         <form method="POST" action="/admin/view_as_member">
             <button type="submit" style="background: #007bff;">Switch to Member View</button>
@@ -3453,7 +4025,7 @@ async def promote_moderator(member_phone: str, request: Request):
         # Get member name for notification
         member = db.execute("SELECT name FROM members WHERE phone = ?", (member_phone,)).fetchone()
         if member:
-            send_sms(member_phone, f"Hey {member['name']}! You've been promoted to Moderator in The Clubhouse. You can now pin posts and help manage the community. 🎉")
+            send_sms(member_phone, f"Hey {member['name']}! You've been promoted to Moderator in The Clubhouse. You can now pin posts and help manage the community.")
 
     return RedirectResponse(url="/admin", status_code=303)
 
@@ -3811,11 +4383,11 @@ async def help_page():
     <h2>Getting Around</h2>
 
     <div class="event">
-        <p><strong>📅 Events</strong> - Your main dashboard. See the calendar and upcoming events.</p>
-        <p><strong>📝 Feed</strong> - Community message board where members share updates.</p>
-        <p><strong>👥 Members</strong> - See everyone in the community and their profiles.</p>
-        <p><strong>🔔 Notifications</strong> - Get notified when someone reacts to or comments on your posts.</p>
-        <p><strong>🔖 Bookmarks</strong> - Save posts to come back to later.</p>
+        <p><strong><i data-lucide="calendar" class="icon icon-sm"></i> Events</strong> - Your main dashboard. See the calendar and upcoming events.</p>
+        <p><strong><i data-lucide="message-square" class="icon icon-sm"></i> Feed</strong> - Community message board where members share updates.</p>
+        <p><strong><i data-lucide="users" class="icon icon-sm"></i> Members</strong> - See everyone in the community and their profiles.</p>
+        <p><strong><i data-lucide="bell" class="icon icon-sm"></i> Notifications</strong> - Get notified when someone reacts to or comments on your posts.</p>
+        <p><strong><i data-lucide="book-marked" class="icon icon-sm"></i> Bookmarks</strong> - Save posts to come back to later.</p>
     </div>
 
     <h2>What You Can Do</h2>
@@ -3823,16 +4395,16 @@ async def help_page():
     <div class="event">
         <p><strong>RSVP to events</strong> - Click an event to see details and say you're coming.</p>
         <p><strong>Post updates</strong> - Share thoughts, questions, or announcements (500 characters max).</p>
-        <p><strong>React with emoji</strong> - Show appreciation with 👍 ❤️ 😂 🎉 🔥</p>
+        <p><strong>React</strong> - Show appreciation with thumbs-up, heart, laugh, celebrate, or fire icons</p>
         <p><strong>Comment on posts</strong> - Join conversations and reply to others.</p>
-        <p><strong>Bookmark posts</strong> - Click the 🔖 to save a post for later.</p>
+        <p><strong>Bookmark posts</strong> - Click the bookmark icon to save a post for later.</p>
         <p><strong>Invite new members</strong> - Generate invite codes to bring friends into the community.</p>
     </div>
 
     <h2>Your Profile</h2>
 
     <div class="event">
-        <p><strong>Avatar</strong> - Pick an emoji that appears next to your posts.</p>
+        <p><strong>Avatar</strong> - Pick an icon that appears next to your posts.</p>
         <p><strong>Display Name</strong> - The name others see (you can change it anytime).</p>
         <p><strong>Birthday</strong> - Optional! We'll wish you happy birthday on your special day.</p>
         <p><strong>Status</strong> - Let others know if you're available, away, or busy.</p>
@@ -3841,9 +4413,9 @@ async def help_page():
     <h2>Member Status Dots</h2>
 
     <div class="event">
-        <p>🟢 <strong>Green</strong> = Available</p>
-        <p>🟡 <strong>Yellow</strong> = Away</p>
-        <p>🔴 <strong>Red</strong> = Busy</p>
+        <p><span class="status-available"><i data-lucide="circle-dot" class="icon icon-sm"></i></span> <strong>Available</strong> - Open to chat</p>
+        <p><span class="status-away"><i data-lucide="moon" class="icon icon-sm"></i></span> <strong>Away</strong> - Stepped out</p>
+        <p><span class="status-busy"><i data-lucide="headphones" class="icon icon-sm"></i></span> <strong>Busy</strong> - Focused, don't disturb</p>
     </div>
 
     <h2>Roles</h2>
@@ -3858,7 +4430,7 @@ async def help_page():
 
     <div class="event">
         <p><strong>How do I change my profile picture?</strong></p>
-        <p class="small">Go to your profile (click your name in the nav) and pick a new avatar emoji.</p>
+        <p class="small">Go to your profile (click your name in the nav) and pick a new avatar icon.</p>
     </div>
 
     <div class="event">
@@ -3884,6 +4456,443 @@ async def help_page():
     <p style="margin-top: 30px;"><a href="/">← Back to home</a></p>
     """
     return render_html(content, f"Help - {SITE_NAME}")
+
+
+# ============ PLAYGROUND (NO DATABASE) ============
+
+def playground_nav(data: dict) -> str:
+    """Generate navigation for playground pages"""
+    member = data["members"][data["current_user"]]
+    user_avatar = avatar_icon(member["avatar"], "sm")
+    return f'''
+    <div class="nav">
+        <a href="/playground">{user_avatar}<strong>{html.escape(member["display_name"])}</strong></a> |
+        <a href="/playground/events">{icon("calendar-days")}<span class="mobile-hide"> Events</span></a> |
+        <a href="/playground/feed">{icon("message-square")}<span class="mobile-hide"> Feed</span></a> |
+        <a href="/playground/members">{icon("book-heart")}<span class="mobile-hide"> Members</span></a> |
+        <a href="/playground/reset" onclick="return confirm('Reset all playground data?')" style="color: #999;">{icon("refresh-cw")}<span class="mobile-hide"> Reset</span></a> |
+        <a href="/" style="color: #999;">Exit Playground</a>
+    </div>
+    <div style="background: #f0f8ff; border: 1px dashed #007bff; padding: 8px 12px; margin-bottom: 20px; font-size: 12px; font-family: var(--font-mono);">
+        <i data-lucide="flask-conical" class="icon icon-sm"></i> <strong>Playground Mode</strong> — Changes are temporary and only visible to you
+    </div>
+    '''
+
+@app.get("/playground")
+async def playground_home(request: Request):
+    """Playground entry point"""
+    session_id = get_playground_session_id(request)
+
+    if not session_id:
+        # New visitor - create session
+        session_id = generate_playground_session()
+        data = playground.get_session(session_id)
+
+        content = f"""
+        <h1>Welcome to the Playground</h1>
+
+        <div class="event">
+            <p>This is a <strong>fully functional sandbox</strong> where you can try everything:</p>
+            <ul style="margin: 15px 0; padding-left: 20px;">
+                <li>Create posts, react, and comment</li>
+                <li>RSVP to events</li>
+                <li>Vote in polls</li>
+                <li>Browse members</li>
+            </ul>
+            <p><strong>Nothing you do here affects the real app.</strong> Your playground is private to you and resets when you click the reset button.</p>
+        </div>
+
+        <div style="margin: 30px 0;">
+            <a href="/playground/feed"><button>Enter Playground</button></a>
+        </div>
+
+        <p class="small">You're signed in as <strong>You (Playground)</strong> with admin privileges so you can try all features.</p>
+
+        <p style="margin-top: 30px;"><a href="/">← Back to main site</a></p>
+        """
+
+        response = render_html(content, "Playground - The Clubhouse")
+        response.set_cookie("playground_session", session_id, max_age=86400, httponly=True)
+        return response
+
+    # Existing session - redirect to feed
+    return RedirectResponse(url="/playground/feed", status_code=303)
+
+
+@app.get("/playground/feed")
+async def playground_feed(request: Request):
+    """Playground feed - view and create posts"""
+    session_id = get_playground_session_id(request)
+    if not session_id:
+        return RedirectResponse(url="/playground", status_code=303)
+
+    data = playground.get_session(session_id)
+    member = data["members"][data["current_user"]]
+
+    # Build posts HTML
+    posts_html = ""
+    sorted_posts = sorted(data["posts"].values(), key=lambda p: (p["is_pinned"], p["posted_date"]), reverse=True)
+
+    for post in sorted_posts:
+        author = data["members"].get(post["phone"], {"display_name": "Unknown", "avatar": "user"})
+        author_name = author.get("display_name") or author.get("name", "Unknown")
+        author_avatar = avatar_icon(author.get("avatar", "user"), "sm")
+        time_ago = format_relative_time(post["posted_date"])
+
+        pinned_badge = '<span style="background: var(--color-success); color: white; padding: 2px 6px; font-size: 11px; border-radius: 3px; margin-right: 8px;">PINNED</span>' if post["is_pinned"] else ""
+
+        # Get reactions for this post
+        post_reactions = [r for r in data["reactions"] if r["post_id"] == post["id"]]
+        reaction_counts = {}
+        user_reacted = {}
+        for r in post_reactions:
+            reaction_counts[r["emoji"]] = reaction_counts.get(r["emoji"], 0) + 1
+            if r["phone"] == data["current_user"]:
+                user_reacted[r["emoji"]] = True
+
+        reactions_html = f'<div class="reactions">'
+        for emoji in REACTION_ICONS:
+            count = reaction_counts.get(emoji, 0)
+            active = "active" if emoji in user_reacted else ""
+            count_display = f' <span class="count">{count}</span>' if count else ' <span class="count"></span>'
+            reactions_html += f'<a href="/playground/react/{post["id"]}/{emoji}" class="reaction-btn {active}" data-emoji="{emoji}"><i data-lucide="{emoji}" class="icon icon-sm"></i>{count_display}</a>'
+        reactions_html += '</div>'
+
+        # Get comments for this post
+        post_comments = [c for c in data["comments"].values() if c["post_id"] == post["id"]]
+        comments_html = ""
+        if post_comments:
+            for comment in sorted(post_comments, key=lambda c: c["posted_date"]):
+                c_author = data["members"].get(comment["phone"], {"display_name": "Unknown", "avatar": "user"})
+                c_avatar = avatar_icon(c_author.get("avatar", "user"), "sm")
+                c_name = c_author.get("display_name") or c_author.get("name", "Unknown")
+                c_time = format_relative_time(comment["posted_date"])
+                comments_html += f'''
+                <div style="margin: 8px 0; padding: 8px; background: rgba(0,0,0,0.02);">
+                    <div style="font-size: 12px; color: #666; margin-bottom: 4px;">
+                        {c_avatar}<strong>{html.escape(c_name)}</strong> · {c_time}
+                    </div>
+                    <div style="font-size: 14px;">{html.escape(comment["content"])}</div>
+                </div>
+                '''
+
+        # Comment form
+        comment_form = f'''
+        <details style="margin-top: 10px;">
+            <summary>{icon("message-circle", "sm")} {len(post_comments)} comment{"s" if len(post_comments) != 1 else ""}</summary>
+            <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--color-border-light);">
+                {comments_html}
+                <form method="POST" action="/playground/comment/{post["id"]}" style="margin-top: 10px;">
+                    <input type="text" name="content" placeholder="Add a comment..." maxlength="280" required style="margin: 0;">
+                    <button type="submit" style="margin-top: 5px;">Comment</button>
+                </form>
+            </div>
+        </details>
+        '''
+
+        content_html = html.escape(post["content"])
+        # Simple link detection
+        import re
+        content_html = re.sub(r'(https?://\S+)', r'<a href="\1" target="_blank">\1</a>', content_html)
+
+        posts_html += f'''
+        <div class="post" id="post-{post["id"]}">
+            <div class="post-header">
+                <span>{author_avatar} <strong>{html.escape(author_name)}</strong></span>
+                <span>{time_ago}</span>
+            </div>
+            <div class="post-content">{pinned_badge}{content_html}</div>
+            {reactions_html}
+            {comment_form}
+        </div>
+        '''
+
+    # Build poll HTML
+    polls_html = ""
+    for poll in data["polls"].values():
+        if poll["is_active"]:
+            options = [o for o in data["poll_options"].values() if o["poll_id"] == poll["id"]]
+            total_votes = sum(o["vote_count"] for o in options)
+            user_vote = next((v for v in data["poll_votes"] if v["poll_id"] == poll["id"] and v["phone"] == data["current_user"]), None)
+
+            options_html = ""
+            for opt in options:
+                pct = (opt["vote_count"] / total_votes * 100) if total_votes > 0 else 0
+                checked = "checked disabled" if user_vote and user_vote["option_id"] == opt["id"] else ""
+                disabled = "disabled" if user_vote else ""
+                options_html += f'''
+                <label style="display: block; margin: 10px 0; padding: 10px; border: 1px solid var(--color-border-light); cursor: pointer;">
+                    <input type="radio" name="option_id" value="{opt["id"]}" {checked} {disabled}>
+                    {html.escape(opt["option_text"])}
+                    <span class="small" style="float: right;">{opt["vote_count"]} votes ({pct:.0f}%)</span>
+                </label>
+                '''
+
+            if user_vote:
+                polls_html += f'''
+                <div class="event" style="background: #f9f9f9;">
+                    <h3>{icon("bar-chart-2", "sm")} {html.escape(poll["question"])}</h3>
+                    {options_html}
+                    <p class="small">You voted · {total_votes} total votes</p>
+                </div>
+                '''
+            else:
+                polls_html += f'''
+                <div class="event" style="background: #f9f9f9;">
+                    <h3>{icon("bar-chart-2", "sm")} {html.escape(poll["question"])}</h3>
+                    <form method="POST" action="/playground/vote/{poll["id"]}">
+                        {options_html}
+                        <button type="submit">Vote</button>
+                    </form>
+                </div>
+                '''
+
+    content = f"""
+    {playground_nav(data)}
+
+    <h1>Feed</h1>
+
+    <form method="POST" action="/playground/post" style="margin-bottom: 30px;">
+        <textarea name="content" placeholder="Share something with the community..." rows="3" maxlength="500" required></textarea>
+        <button type="submit">Post</button>
+    </form>
+
+    {polls_html}
+    {posts_html}
+    """
+
+    return render_html(content, "Feed - Playground")
+
+
+@app.post("/playground/post")
+async def playground_create_post(request: Request, content: str = Form(...)):
+    """Create a post in the playground"""
+    session_id = get_playground_session_id(request)
+    if not session_id:
+        return RedirectResponse(url="/playground", status_code=303)
+
+    data = playground.get_session(session_id)
+    post_id = data["counters"]["post_id"]
+    data["counters"]["post_id"] += 1
+
+    data["posts"][post_id] = {
+        "id": post_id,
+        "phone": data["current_user"],
+        "content": content[:500],
+        "posted_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "is_pinned": 0
+    }
+
+    return RedirectResponse(url="/playground/feed", status_code=303)
+
+
+@app.get("/playground/react/{post_id}/{emoji}")
+async def playground_react(post_id: int, emoji: str, request: Request):
+    """Toggle reaction on a post"""
+    session_id = get_playground_session_id(request)
+    if not session_id:
+        return RedirectResponse(url="/playground", status_code=303)
+
+    data = playground.get_session(session_id)
+    user = data["current_user"]
+
+    # Check if already reacted with this emoji
+    existing = next((i for i, r in enumerate(data["reactions"]) if r["post_id"] == post_id and r["phone"] == user and r["emoji"] == emoji), None)
+
+    if existing is not None:
+        # Remove reaction
+        data["reactions"].pop(existing)
+    else:
+        # Add reaction
+        data["reactions"].append({"post_id": post_id, "phone": user, "emoji": emoji})
+
+    return RedirectResponse(url="/playground/feed", status_code=303)
+
+
+@app.post("/playground/comment/{post_id}")
+async def playground_comment(post_id: int, request: Request, content: str = Form(...)):
+    """Add comment to a post"""
+    session_id = get_playground_session_id(request)
+    if not session_id:
+        return RedirectResponse(url="/playground", status_code=303)
+
+    data = playground.get_session(session_id)
+    comment_id = data["counters"]["comment_id"]
+    data["counters"]["comment_id"] += 1
+
+    data["comments"][comment_id] = {
+        "id": comment_id,
+        "post_id": post_id,
+        "phone": data["current_user"],
+        "content": content[:280],
+        "posted_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    }
+
+    return RedirectResponse(url="/playground/feed", status_code=303)
+
+
+@app.post("/playground/vote/{poll_id}")
+async def playground_vote(poll_id: int, request: Request, option_id: int = Form(...)):
+    """Vote in a poll"""
+    session_id = get_playground_session_id(request)
+    if not session_id:
+        return RedirectResponse(url="/playground", status_code=303)
+
+    data = playground.get_session(session_id)
+    user = data["current_user"]
+
+    # Check if already voted
+    if not any(v for v in data["poll_votes"] if v["poll_id"] == poll_id and v["phone"] == user):
+        data["poll_votes"].append({"poll_id": poll_id, "phone": user, "option_id": option_id})
+        if option_id in data["poll_options"]:
+            data["poll_options"][option_id]["vote_count"] += 1
+
+    return RedirectResponse(url="/playground/feed", status_code=303)
+
+
+@app.get("/playground/events")
+async def playground_events(request: Request):
+    """Playground events page"""
+    session_id = get_playground_session_id(request)
+    if not session_id:
+        return RedirectResponse(url="/playground", status_code=303)
+
+    data = playground.get_session(session_id)
+    user = data["current_user"]
+
+    events_html = ""
+    for event in sorted(data["events"].values(), key=lambda e: e["event_date"]):
+        if event["is_cancelled"]:
+            continue
+
+        rsvp_count = len([r for r in data["rsvps"] if r["event_id"] == event["id"]])
+        user_rsvp = any(r for r in data["rsvps"] if r["event_id"] == event["id"] and r["phone"] == user)
+
+        spots_text = ""
+        if event["max_spots"]:
+            spots_left = event["max_spots"] - rsvp_count
+            spots_text = f'<span class="small">{spots_left} of {event["max_spots"]} spots left</span>'
+        else:
+            spots_text = f'<span class="small">{rsvp_count} attending</span>'
+
+        if user_rsvp:
+            button = f'<a href="/playground/unrsvp/{event["id"]}"><button style="background: #666;">Cancel RSVP</button></a>'
+            badge = f' <span style="background: var(--color-success); color: white; padding: 2px 6px; font-size: 11px;">GOING</span>'
+        else:
+            if event["max_spots"] and rsvp_count >= event["max_spots"]:
+                button = '<button disabled style="background: #ccc;">Full</button>'
+            else:
+                button = f'<a href="/playground/rsvp/{event["id"]}"><button>RSVP</button></a>'
+            badge = ""
+
+        time_str = format_event_time(event["event_date"], event.get("start_time"), event.get("end_time"))
+
+        events_html += f'''
+        <div class="event">
+            <h3>{html.escape(event["title"])}{badge}</h3>
+            <p>{html.escape(event["description"] or "")}</p>
+            <p class="small">{icon("calendar-days", "sm")} {time_str}</p>
+            {spots_text}
+            {button}
+        </div>
+        '''
+
+    content = f"""
+    {playground_nav(data)}
+
+    <h1>Events</h1>
+
+    {events_html if events_html else '<p>No upcoming events.</p>'}
+    """
+
+    return render_html(content, "Events - Playground")
+
+
+@app.get("/playground/rsvp/{event_id}")
+async def playground_rsvp(event_id: int, request: Request):
+    """RSVP to an event"""
+    session_id = get_playground_session_id(request)
+    if not session_id:
+        return RedirectResponse(url="/playground", status_code=303)
+
+    data = playground.get_session(session_id)
+    user = data["current_user"]
+
+    if not any(r for r in data["rsvps"] if r["event_id"] == event_id and r["phone"] == user):
+        data["rsvps"].append({"event_id": event_id, "phone": user})
+
+    return RedirectResponse(url="/playground/events", status_code=303)
+
+
+@app.get("/playground/unrsvp/{event_id}")
+async def playground_unrsvp(event_id: int, request: Request):
+    """Cancel RSVP"""
+    session_id = get_playground_session_id(request)
+    if not session_id:
+        return RedirectResponse(url="/playground", status_code=303)
+
+    data = playground.get_session(session_id)
+    user = data["current_user"]
+
+    data["rsvps"] = [r for r in data["rsvps"] if not (r["event_id"] == event_id and r["phone"] == user)]
+
+    return RedirectResponse(url="/playground/events", status_code=303)
+
+
+@app.get("/playground/members")
+async def playground_members(request: Request):
+    """Playground members page"""
+    session_id = get_playground_session_id(request)
+    if not session_id:
+        return RedirectResponse(url="/playground", status_code=303)
+
+    data = playground.get_session(session_id)
+
+    members_html = ""
+    for m in sorted(data["members"].values(), key=lambda x: x["joined_date"], reverse=True):
+        m_avatar = avatar_icon(m.get("avatar", "user"))
+        m_name = m.get("display_name") or m.get("name", "Unknown")
+
+        status = m.get("status", "available")
+        status_icons = {
+            "available": '<span class="status-available" title="Available"><i data-lucide="circle-dot" class="icon icon-sm"></i></span>',
+            "away": '<span class="status-away" title="Away"><i data-lucide="moon" class="icon icon-sm"></i></span>',
+            "busy": '<span class="status-busy" title="Busy"><i data-lucide="headphones" class="icon icon-sm"></i></span>'
+        }
+        status_icon = status_icons.get(status, status_icons["available"])
+
+        badge = ""
+        if m.get("is_admin"):
+            badge = '<span style="background: #000; color: #fff; padding: 2px 6px; font-size: 11px; margin-left: 8px;">ADMIN</span>'
+        elif m.get("is_moderator"):
+            badge = '<span style="background: #666; color: #fff; padding: 2px 6px; font-size: 11px; margin-left: 8px;">MOD</span>'
+
+        members_html += f'''
+        <div class="event" style="padding: 12px;">
+            <h3 style="margin: 0;">{m_avatar} {status_icon} {html.escape(m_name)}{badge}</h3>
+            <p class="small" style="margin: 5px 0 0 0;">{status.capitalize()}</p>
+        </div>
+        '''
+
+    content = f"""
+    {playground_nav(data)}
+
+    <h1>Members ({len(data["members"])})</h1>
+
+    {members_html}
+    """
+
+    return render_html(content, "Members - Playground")
+
+
+@app.get("/playground/reset")
+async def playground_reset(request: Request):
+    """Reset playground to fresh state"""
+    session_id = get_playground_session_id(request)
+    if session_id:
+        playground.reset_session(session_id)
+
+    return RedirectResponse(url="/playground/feed", status_code=303)
 
 
 # ============ HEALTH CHECK ============

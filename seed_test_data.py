@@ -54,17 +54,18 @@ def seed_database():
 
     # Sample members (with realistic names and fake phone numbers)
     # Format: (phone, name, handle, display_name, avatar, birthday, is_admin, is_moderator, status)
+    # Avatars use Lucide icon names
     members = [
-        ("5551234567", "Alex", "alex", "Alex Rivera", "🦁", "1995-03-15", 1, 0, "available"),  # Admin
-        ("5551234568", "Jordan", "jordan", "Jordan K.", "🎨", "1998-07-22", 0, 1, "available"),  # Moderator
-        ("5551234569", "Taylor", "taylor", "Tay ✨", "✨", "1997-11-08", 0, 1, "away"),  # Moderator
-        ("5551234570", "Morgan", "morgan", "Morgan", "🐼", "1996-05-30", 0, 0, "available"),
-        ("5551234571", "Casey", "casey", "Casey Chen", "🔥", "1999-01-14", 0, 0, "busy"),
-        ("5551234572", "Riley", "riley", "Riley", "🌟", "1994-09-03", 0, 0, "available"),
-        ("5551234573", "Jamie", "jamie", "Jamie Smith", "🐶", "1998-12-25", 0, 0, "away"),
-        ("5551234574", "Avery", "avery", "Avery", "🤓", "1997-04-18", 0, 0, "available"),
-        ("5551234575", "Drew", "drew", "Drew Martinez", "🎭", "1995-08-07", 0, 0, "available"),
-        ("5551234576", "Sam", "sam", "Sam", "🦊", "1996-10-29", 0, 0, "busy"),
+        ("5551234567", "Alex", "alex", "Alex Rivera", "squirrel", "1995-03-15", 1, 0, "available"),  # Admin
+        ("5551234568", "Jordan", "jordan", "Jordan K.", "sprout", "1998-07-22", 0, 1, "available"),  # Moderator
+        ("5551234569", "Taylor", "taylor", "Taylor", "star", "1997-11-08", 0, 1, "away"),  # Moderator
+        ("5551234570", "Morgan", "morgan", "Morgan", "shell", "1996-05-30", 0, 0, "available"),
+        ("5551234571", "Casey", "casey", "Casey Chen", "sword", "1999-01-14", 0, 0, "busy"),
+        ("5551234572", "Riley", "riley", "Riley", "sun", "1994-09-03", 0, 0, "available"),
+        ("5551234573", "Jamie", "jamie", "Jamie Smith", "sailboat", "1998-12-25", 0, 0, "away"),
+        ("5551234574", "Avery", "avery", "Avery", "square-terminal", "1997-04-18", 0, 0, "available"),
+        ("5551234575", "Drew", "drew", "Drew Martinez", "skull", "1995-08-07", 0, 0, "available"),
+        ("5551234576", "Sam", "sam", "Sam", "scale", "1996-10-29", 0, 0, "busy"),
     ]
 
     # Insert members with staggered join dates
@@ -161,8 +162,8 @@ def seed_database():
     post_ids = [row[0] for row in cursor.execute("SELECT id FROM posts").fetchall()]
     print(f"✅ Added {len(posts_data)} posts")
 
-    # Add reactions to posts
-    emojis = ["👍", "❤️", "😂", "🎉", "🔥"]
+    # Add reactions to posts (using Lucide icon names)
+    emojis = ["thumbs-up", "heart", "laugh", "party-popper", "flame"]
     for post_id in post_ids:
         num_reactions = random.randint(1, 5)
         reactors = random.sample(phones, min(num_reactions, len(phones)))
