@@ -1056,11 +1056,12 @@ def render_html(content: str, title: str = "The Clubhouse") -> HTMLResponse:
             input, textarea, select {{
                 font-family: inherit;
                 font-size: inherit;
-                padding: 8px;
+                padding: 10px 12px;
                 margin: 10px 0;
                 width: 100%;
                 box-sizing: border-box;
-                border: 1px solid var(--color-border);
+                border: 1px solid var(--color-border-light);
+                border-radius: 6px;
                 background: var(--color-bg);
                 color: var(--color-text);
                 transition: border-color 0.15s ease, box-shadow 0.15s ease;
@@ -1068,7 +1069,7 @@ def render_html(content: str, title: str = "The Clubhouse") -> HTMLResponse:
             input:focus, textarea:focus, select:focus {{
                 outline: none;
                 border-color: var(--color-accent);
-                box-shadow: 0 0 0 3px rgba(26, 26, 26, 0.1);
+                box-shadow: 0 0 0 3px rgba(26, 26, 26, 0.08);
             }}
             button {{
                 font-family: var(--font-mono);
@@ -1077,6 +1078,7 @@ def render_html(content: str, title: str = "The Clubhouse") -> HTMLResponse:
                 background: var(--color-accent);
                 color: var(--color-bg);
                 border: none;
+                border-radius: 6px;
                 cursor: pointer;
                 margin-top: 10px;
                 letter-spacing: 0.01em;
@@ -1090,7 +1092,8 @@ def render_html(content: str, title: str = "The Clubhouse") -> HTMLResponse:
                 transform: scale(0.98);
             }}
             .event {{
-                border: 1px solid var(--color-border);
+                border: 1px solid var(--color-border-light);
+                border-radius: 8px;
                 padding: 15px;
                 margin: 15px 0;
                 transition: box-shadow 0.15s ease, transform 0.15s ease;
@@ -1106,7 +1109,9 @@ def render_html(content: str, title: str = "The Clubhouse") -> HTMLResponse:
             }}
             .photo-item {{
                 border: 1px solid var(--color-border-light);
+                border-radius: 6px;
                 padding: 5px;
+                overflow: hidden;
             }}
             .photo-item img {{
                 width: 100%;
@@ -1114,7 +1119,8 @@ def render_html(content: str, title: str = "The Clubhouse") -> HTMLResponse:
                 display: block;
             }}
             .post {{
-                border: 1px solid var(--color-border);
+                border: 1px solid var(--color-border-light);
+                border-radius: 8px;
                 padding: 15px;
                 margin: 15px 0;
                 transition: box-shadow 0.15s ease;
@@ -1205,9 +1211,10 @@ def render_html(content: str, title: str = "The Clubhouse") -> HTMLResponse:
             }}
             .hint {{
                 font-family: var(--font-mono);
-                background: #fafaf8;
-                border-left: 3px solid var(--color-border-light);
-                padding: 10px 15px;
+                background: transparent;
+                border: 1px solid var(--color-border-light);
+                border-radius: 6px;
+                padding: 12px 15px;
                 margin: 15px 0;
                 font-size: 12px;
                 color: var(--color-text-muted);
@@ -1228,13 +1235,23 @@ def render_html(content: str, title: str = "The Clubhouse") -> HTMLResponse:
                 font-size: 13px;
                 margin-bottom: 30px;
                 padding-bottom: 10px;
-                border-bottom: 1px solid var(--color-border);
+                border-bottom: 1px solid var(--color-border-light);
+                line-height: 2;
             }}
             .nav a {{
                 text-decoration: none;
+                white-space: nowrap;
             }}
             .nav a:hover {{
                 text-decoration: underline;
+            }}
+            @media (max-width: 600px) {{
+                .nav {{
+                    font-size: 12px;
+                }}
+                .mobile-hide {{
+                    display: none;
+                }}
             }}
             details {{
                 margin-top: 10px;
@@ -2139,58 +2156,87 @@ async def dashboard(request: Request, year: int = None, month: int = None):
         <style>
             .calendar {
                 width: 100%;
-                border-collapse: collapse;
+                border-collapse: separate;
+                border-spacing: 0;
                 margin: 20px 0;
                 font-size: 14px;
                 table-layout: fixed;
+                border: 1px solid var(--color-border-light);
+                border-radius: 8px;
+                overflow: hidden;
             }
             .calendar th {
-                background: #000;
-                color: #fff;
-                padding: 10px;
+                background: #f8f8f8;
+                color: var(--color-text);
+                padding: 12px 10px;
                 text-align: center;
-                font-weight: normal;
+                font-weight: 500;
+                font-size: 12px;
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+                border-bottom: 1px solid var(--color-border-light);
             }
             .calendar td {
-                border: 1px solid #000;
+                border: 1px solid var(--color-border-light);
+                border-top: none;
+                border-left: none;
                 padding: 6px;
                 vertical-align: top;
                 height: 80px;
                 width: 14.28%;
                 overflow: hidden;
+                background: #fff;
+                transition: background 0.15s ease;
+            }
+            .calendar td:first-child {
+                border-left: none;
+            }
+            .calendar tr:last-child td:first-child {
+                border-bottom-left-radius: 7px;
+            }
+            .calendar tr:last-child td:last-child {
+                border-bottom-right-radius: 7px;
             }
             .calendar td.empty {
-                background: #f5f5f5;
+                background: #fafafa;
             }
             .day-number {
-                font-weight: bold;
+                font-weight: 600;
                 margin-bottom: 4px;
                 font-size: 13px;
+                color: var(--color-text);
             }
             .calendar-event {
                 font-size: 10px;
-                padding: 2px 4px;
+                padding: 3px 5px;
                 margin: 2px 0;
-                background: #f0f0f0;
-                border-left: 3px solid #000;
+                background: #f5f5f5;
+                border-left: 3px solid var(--color-text-muted);
+                border-radius: 0 4px 4px 0;
                 overflow: hidden;
                 text-overflow: ellipsis;
                 white-space: nowrap;
-                line-height: 1.2;
+                line-height: 1.3;
                 display: block;
                 text-decoration: none;
-                color: #000;
+                color: var(--color-text);
+                transition: background 0.15s ease;
             }
             .calendar-event:hover {
-                background: #e0e0e0;
+                background: #ebebeb;
                 cursor: pointer;
             }
             .calendar-event.attending {
-                background: #d4edda;
-                border-left-color: #28a745;
+                background: rgba(45, 106, 79, 0.12);
+                border-left-color: var(--color-success);
+                color: var(--color-success);
             }
             .today {
-                background: #fffacd;
+                background: #fffef5;
+                box-shadow: inset 0 0 0 2px rgba(200, 180, 50, 0.3);
+            }
+            .today .day-number {
+                color: #8b7500;
             }
             .calendar-nav {
                 display: flex;
@@ -2198,15 +2244,27 @@ async def dashboard(request: Request, year: int = None, month: int = None):
                 align-items: center;
                 margin: 10px 0;
             }
+            .calendar-nav h2 {
+                margin: 0;
+                font-size: 18px;
+            }
+            .calendar-nav a {
+                text-decoration: none;
+            }
             .calendar-nav button {
                 padding: 8px 16px;
-                background: #000;
-                color: #fff;
-                border: none;
+                background: transparent;
+                color: var(--color-text);
+                border: 1px solid var(--color-border);
+                border-radius: 6px;
                 cursor: pointer;
+                font-size: 13px;
+                transition: all 0.15s ease;
+                min-height: 40px;
             }
             .calendar-nav button:hover {
-                background: #333;
+                background: var(--color-text);
+                color: #fff;
             }
         </style>
         """
@@ -2253,16 +2311,11 @@ async def dashboard(request: Request, year: int = None, month: int = None):
                         for event in events_by_day[day]:
                             attending_class = "attending" if event["is_attending"] else ""
 
-                            # Format time display for calendar
+                            # Format time display for calendar (just start time to save space)
                             if event["start_time"]:
-                                start = datetime.strptime(event["start_time"], "%H:%M").strftime("%I:%M%p").lstrip("0")
-                                if event["end_time"]:
-                                    end = datetime.strptime(event["end_time"], "%H:%M").strftime("%I:%M%p").lstrip("0")
-                                    event_time = f"{start}-{end}"
-                                else:
-                                    event_time = start
+                                event_time = datetime.strptime(event["start_time"], "%H:%M").strftime("%I:%M%p").lstrip("0").lower()
                             else:
-                                event_time = "All day"
+                                event_time = ""
 
                             calendar_html += f'<a href="#event-{event["id"]}" class="calendar-event {attending_class}" title="{html.escape(event["title"])}">{event_time} {html.escape(event["title"])}</a>'
 
