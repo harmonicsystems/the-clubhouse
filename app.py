@@ -2941,11 +2941,11 @@ async def feed(request: Request, q: str = ""):
         nav_html += f'<a href="/feed">{icon("message-square")}<span class="mobile-hide"> Feed</span></a> | '
         nav_html += f'<a href="/members">{icon("book-heart")}<span class="mobile-hide"> Members</span></a> | '
         nav_html += f'<a href="/notifications">{icon("bell")}<span class="mobile-hide"> Notifications</span>{notif_badge}</a> | '
-        nav_html += '<a href="/bookmarks">{icon("book-marked")}<span class="mobile-hide"> Bookmarks</span></a> | '
+        nav_html += f'<a href="/bookmarks">{icon("book-marked")}<span class="mobile-hide"> Bookmarks</span></a> | '
         if member["is_admin"] and not viewing_as_member:
-            nav_html += '<a href="/admin">Admin</a> | '
-        nav_html += '<a href="/logout">Sign out</a> | '
-        nav_html += '<a href="/help">?</a>'
+            nav_html += f'<a href="/admin">{icon("terminal")}<span class="mobile-hide"> Admin</span></a> | '
+        nav_html += f'<a href="/logout">{icon("log-out")}<span class="mobile-hide"> Sign out</span></a> | '
+        nav_html += f'<a href="/help">{icon("help-circle")}</a>'
         nav_html += '</div>'
 
         csrf_token = get_csrf_token(phone)
@@ -3300,11 +3300,11 @@ async def bookmarks_page(request: Request):
         nav_html += f'<a href="/feed">{icon("message-square")}<span class="mobile-hide"> Feed</span></a> | '
         nav_html += f'<a href="/members">{icon("book-heart")}<span class="mobile-hide"> Members</span></a> | '
         nav_html += f'<a href="/notifications">{icon("bell")}<span class="mobile-hide"> Notifications</span>{notif_badge}</a> | '
-        nav_html += '<a href="/bookmarks">{icon("book-marked")}<span class="mobile-hide"> Bookmarks</span></a> | '
+        nav_html += f'<a href="/bookmarks">{icon("book-marked")}<span class="mobile-hide"> Bookmarks</span></a> | '
         if member["is_admin"]:
-            nav_html += '<a href="/admin">Admin</a> | '
-        nav_html += '<a href="/logout">Sign out</a> | '
-        nav_html += '<a href="/help">?</a>'
+            nav_html += f'<a href="/admin">{icon("terminal")}<span class="mobile-hide"> Admin</span></a> | '
+        nav_html += f'<a href="/logout">{icon("log-out")}<span class="mobile-hide"> Sign out</span></a> | '
+        nav_html += f'<a href="/help">{icon("help-circle")}</a>'
         nav_html += '</div>'
 
     content = f"""
