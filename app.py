@@ -3624,8 +3624,10 @@ async def profile_page(request: Request):
     # Icon picker
     icon_picker = '<div style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; max-width: 360px;">'
     for icon_name in AVATAR_ICONS:
-        selected = 'style="background: var(--color-border); color: var(--color-bg);"' if icon_name == current_avatar else ''
-        icon_picker += f'''<button type="button" onclick="selectAvatar('{icon_name}')" class="avatar-option" id="avatar-{icon_name}" {selected} style="padding: 12px; cursor: pointer; border: 1px solid var(--color-border); background: var(--color-bg);"><i data-lucide="{icon_name}" class="icon icon-lg"></i></button>'''
+        is_selected = icon_name == current_avatar
+        bg = "var(--color-text)" if is_selected else "var(--color-bg)"
+        fg = "var(--color-bg)" if is_selected else "var(--color-text)"
+        icon_picker += f'''<button type="button" onclick="selectAvatar('{icon_name}')" class="avatar-option" id="avatar-{icon_name}" style="padding: 12px; cursor: pointer; border: 1px solid var(--color-border-light); border-radius: 8px; background: {bg}; color: {fg};"><i data-lucide="{icon_name}" class="icon icon-lg"></i></button>'''
     icon_picker += '</div>'
 
     # Get unread notification count
@@ -3678,7 +3680,7 @@ async def profile_page(request: Request):
                 btn.style.background = 'var(--color-bg)';
                 btn.style.color = 'var(--color-text)';
             }});
-            document.getElementById('avatar-' + iconName).style.background = 'var(--color-border)';
+            document.getElementById('avatar-' + iconName).style.background = 'var(--color-text)';
             document.getElementById('avatar-' + iconName).style.color = 'var(--color-bg)';
             lucide.createIcons();
         }}
